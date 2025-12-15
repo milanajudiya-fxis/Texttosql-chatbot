@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "text-to-sql-agent"
+version = "1.0.0"
+description = "A production-grade Text-to-SQL agent using LangChain and Google Generative AI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["sql", "llm", "text-to-sql", "langchain", "langgraph"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "langgraph==1.0.4",
+    "langchain==1.1.0",
+    "langchain_community==0.4.1",
+    "pymysql==1.1.2",
+    "langchain_google_genai==3.2.0",
+    "streamlit==1.52.0",
+    "cryptography==46.0.3",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "isort>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/text-to-sql-agent"
+Documentation = "https://github.com/yourusername/text-to-sql-agent/blob/main/README.md"
+Repository = "https://github.com/yourusername/text-to-sql-agent.git"
+Issues = "https://github.com/yourusername/text-to-sql-agent/issues"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=src --cov-report=html"

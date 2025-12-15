@@ -1,0 +1,16 @@
+langgraph==1.0.4
+langchain==1.1.0
+langchain_community==0.4.1
+pymysql==1.1.2
+langchain_openai>=0.2.0
+streamlit==1.52.0
+cryptography==46.0.3
+python-dotenv>=1.0.0
+twilio>=9.0.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+colorlog==6.10.1
+python-multipart==0.0.20
+pyppeteer==2.0.0
+redis>=5.0.0
+rq>=1.15.0
