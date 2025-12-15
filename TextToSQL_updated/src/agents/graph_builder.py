@@ -70,7 +70,7 @@ class AgentGraphBuilder:
 
     
     
-        # Start → classify first in 3 category and based on that which path need to follow(V3) 
+        # Start → classify first in 4 category and based on that which path need to follow(V3) 
         builder.add_edge(START, "fetch_conversation_history")
         builder.add_edge("fetch_conversation_history", "classify_query")
         builder.add_conditional_edges(
@@ -79,31 +79,27 @@ class AgentGraphBuilder:
                 "IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION"
                 if "IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION" in state["messages"][-1].content.upper()
                 else (
-                    "IN_DOMAIN_OUTSIDE_CONVERSATION"
-                    if "IN_DOMAIN_OUTSIDE_CONVERSATION" in state["messages"][-1].content.upper()
-                    else "OUT_OF_DOMAIN"
+                    "IN_DOMAIN_DB_QUERY"
+                    if "IN_DOMAIN_DB_QUERY" in state["messages"][-1].content.upper()
+                    else (
+                        "IN_DOMAIN_WEB_SEARCH"
+                        if "IN_DOMAIN_WEB_SEARCH" in state["messages"][-1].content.upper()
+                        else "OUT_OF_DOMAIN"
+                    )
                 )
             ),
             {
                 "IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION": "answer_from_previous_conversation",
-                "IN_DOMAIN_OUTSIDE_CONVERSATION": "web_search",
+                "IN_DOMAIN_DB_QUERY": "list_db_tables",
+                "IN_DOMAIN_WEB_SEARCH": "web_search",
                 "OUT_OF_DOMAIN": "answer_general"
             }
         )
         builder.add_edge("answer_general", END)
         builder.add_edge("answer_from_previous_conversation", END)
-        builder.add_conditional_edges(
-            "web_search",
-            lambda state: (
-                "list_db_tables"
-                if state["messages"][-1].content == "NO_INFORMATION_FOUND"
-                else "END"
-            ),
-            {
-                "list_db_tables": "list_db_tables",
-                "END": END
-            }
-        )
+        
+        # Web search now ends after searching, no fallback to DB
+        builder.add_edge("web_search", END)
         
         builder.add_edge("list_db_tables", "call_get_schema")
         builder.add_edge("call_get_schema", "get_schema")
