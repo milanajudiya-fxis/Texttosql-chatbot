@@ -162,26 +162,6 @@ async def test_endpoint():
     }
 
 
-def split_message(message: str, max_length: int = 1600) -> list[str]:
-    """
-    Split message into chunks <= max_length without breaking words.
-    """
-    parts = []
-    current = ""
-
-    for word in message.split(" "):
-        # +1 for space
-        if len(current) + len(word) + 1 > max_length:
-            parts.append(current.strip())
-            current = word
-        else:
-            current += " " + word if current else word
-
-    if current:
-        parts.append(current.strip())
-
-    return parts
-
 
 @app.post("/webhook/whatsapp")
 async def whatsapp_webhook(
