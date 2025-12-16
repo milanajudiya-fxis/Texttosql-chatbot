@@ -113,6 +113,7 @@ class AgentNodes:
         logger.info("---------------------"*8)
         return {"messages": [response]}
     
+    # LLM CALL 02_C
     def web_search_node(self, state: MessagesState):
         """Search using LangChain's web search tool with optional domain filtering."""
         import time
@@ -317,7 +318,7 @@ class AgentNodes:
         return {"messages": []}
   
     # LLM based tool call generate schema only for query related tables (no manual tool call here)
-    # LLM CALL 02_C
+    # LLM CALL 02_D
     def call_get_schema_llm(self, state: MessagesState):
         start_time = time.time()
         llm = self.llm.bind_tools([self.toolkit.get_schema_tool_obj()], tool_choice="any")
@@ -331,7 +332,7 @@ class AgentNodes:
         return {"messages": [response]}
     
   
-  # LLM CALL 03_C
+    # LLM CALL 03_D
     def generate_query(self, state: MessagesState):
         """Generate SQL query from natural language"""
         start_time = time.time()
@@ -354,7 +355,7 @@ class AgentNodes:
         logger.info("---------------------"*8)
         return {"messages": [response]}
 
-    # LLM CALL 04_C ( Adding SQL in metadata )
+    # LLM CALL 04_D ( Adding SQL in metadata )
     def check_query(self, state: MessagesState):
         """
         Validate SQL query WITHOUT calling any tool.
@@ -406,7 +407,7 @@ class AgentNodes:
             }]
         }
 
-    # working v3
+    
     def should_continue(self, state: MessagesState):
         """
         Determine next step based on VALID/INVALID result
@@ -496,7 +497,7 @@ class AgentNodes:
                 }]
             }
 
-    # LLM CALL 05_C
+    # LLM CALL 05_D
     def generate_response(self, state: MessagesState):
         """Generate final answer to user based on query results"""
         start_time = time.time()
