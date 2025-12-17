@@ -176,6 +176,7 @@ async def whatsapp_webhook(
     enqueues them for background processing, and returns immediately.
     """
     try:
+        start_time = time.time()
         logger.info(f"Incoming message from {From}: '{Body[:100]}...'")
         
         # Load settings
@@ -198,6 +199,7 @@ async def whatsapp_webhook(
         # We return an empty TwiML response so Twilio doesn't send anything back immediately
         # The worker will send the actual response asynchronously
         resp = MessagingResponse()
+        logger.critical(f"Task enqueued successfully in {time.time() - start_time:.2f}s")
         return str(resp)
         
     except Exception as e:

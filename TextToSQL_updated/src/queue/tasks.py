@@ -158,7 +158,7 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str):
         send_whatsapp_message(user_number, result)
         
         elapsed_time = time.time() - start
-        logger.info(f"Task completed successfully in {elapsed_time:.2f}s")
+        logger.critical(f"Task completed successfully in {elapsed_time:.2f}s")
         return True
 
     except Exception as e:

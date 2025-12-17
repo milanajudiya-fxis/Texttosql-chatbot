@@ -41,9 +41,9 @@ class AgentNodes:
     def fetch_conversation_history(self, state: MessagesState):
         """Fetch last 15 conversation messages and prepend them before the current query."""
         start_time = time.time()
+        logger.warning("************** FETCH CONVERSATION HISTORY ************** ")
         current_message = state["messages"][-1]
         new_messages = []
-        logger.info("############ FETCH CONVERSATION HISTORY ############################################")
         if self.conversation_manager and self.thread_id:
             history = self.conversation_manager.get_last_messages(
                 self.thread_id, limit=15
@@ -59,18 +59,19 @@ class AgentNodes:
                         new_messages.append(AIMessage(content=msg["content"]))
         state["messages"] = new_messages
         logger.info(f"CURRENT USER QUERY: {current_message}")
-        logger.info(f"fetch conversation node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.critical(f"fetch conversation node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
         return state
     
     # LLM CALL 01 (SAME PROMPT FOR ALL)
     def classify_query(self, state: MessagesState):
         """Classify whether query is related to database or general question."""
         start_time = time.time()
+        logger.warning("************** CLASSIFY QUERY **************")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         messages = state["messages"]
-        # 1. SYSTEM MESSAGE
         system_message = get_classify_query_prompt()
-        # 2. EXTRACT PREVIOUS CONVERSATION
         previous_conversation = messages[1:-1] if len(messages) > 2 else []
         clean_previous_history = []
         if previous_conversation:
@@ -103,33 +104,28 @@ class AgentNodes:
         llm = self.llm
         response = llm.invoke(messages_for_llm)
         decision = response.content.strip().upper()
-
-        logger.info("############ CLASSIFY QUERY ############################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"Classification result: {decision}")
         logger.info(f"response content: {response}")
-        logger.info(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
         return {"messages": [response]}
     
     # LLM CALL 02_C
     def web_search_node(self, state: MessagesState):
         """Search using LangChain's web search tool with optional domain filtering."""
-        import time
         start_time = time.time()
+        logger.warning("**************  WEB SEARCH NODE  ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
 
         user_query = self.user_query
         domain = "siciliangames.com"
 
         # Build search query
         search_query = f"{user_query} site:{domain}" if domain else user_query
-
-        logger.info("############ WEB SEARCH NODE (LANGCHAIN) ############################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"Query: {user_query}")
         logger.info(f"Domain filter: {domain}")
+        
 
         def extract_answer_from_response(response):
             content = getattr(response, "content", None)
@@ -159,17 +155,17 @@ class AgentNodes:
                 ]
             )
             answer = extract_answer_from_response(response)
-            logger.info(f"Web search result: {answer}")
-
+            logger.info(f"LLM response: {response}")
+            
             if not answer or "no_information_found" in answer.lower():
                 logger.warning("No meaningful information found from web search")
-                logger.info(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
-                logger.info("---------------------" * 8)
+                logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
+                logger.info("---------------------" * 4)
 
                 return {
                     "messages": [
                         AIMessage(
-                            content="NO_INFORMATION_FOUND",
+                            content="Sorry, we couldn’t find any relevant information. Would you like to know more about Sicilian Games? Please ask if you have any relevant questions.",
                             additional_kwargs={
                                 "source": "web_search",
                                 "query": user_query,
@@ -179,10 +175,9 @@ class AgentNodes:
                     ]
                 }
 
-            # Success
             logger.info(f"Web search result: {answer}")
-            logger.info(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
-            logger.info("---------------------" * 8)
+            logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------" * 4)
 
             return {
                 "messages": [
@@ -200,13 +195,13 @@ class AgentNodes:
         except Exception as e:
             # error handling
             logger.error(f"Error during web search: {str(e)}")
-            logger.info(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
-            logger.info("---------------------" * 8)
+            logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------" * 4)
 
             return {
                 "messages": [
                     AIMessage(
-                        content="NO_INFORMATION_FOUND",
+                        content="orry, we couldn’t find any relevant information. Would you like to know more about Sicilian Games? Please ask if you have any relevant questions",
                         additional_kwargs={
                             "source": "web_search",
                             "error": str(e),
@@ -216,10 +211,14 @@ class AgentNodes:
                 ]
         }
 
+
     # LLM CALL 02_A
     def answer_general(self, state: MessagesState):
         """Answer non-database related user questions normally."""
         start_time = time.time()
+        logger.warning("************** GENERAL ANSWER **************")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         user_msg = next(
             (msg for msg in reversed(state["messages"]) if msg.type == "human"),
             None
@@ -235,23 +234,21 @@ class AgentNodes:
             {"role": "user", "content": user_msg.content}
         ]
         response = llm.invoke(messages_for_llm)
-        logger.info("############ GENERAL ANSWER  ################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"User current message: {user_msg.content}")
         logger.info(f"General answer response: {response.content}")
         logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.info("---------------------"*4)
         return {"messages": [response]}
     
     # LLM CALL 02_B (SAME SYS PROMPT FOR ALL)
     def answer_from_previous_conversation(self, state: MessagesState):
         """Classify whether query is related to database or general question."""
         start_time = time.time()
+        logger.warning("**************  ANSWER FROM PREVIOUS CONVO ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         messages = state["messages"]
-        # 1. SYSTEM MESSAGE
         system_message = get_answer_from_previous_convo_prompt()
-        # 2. EXTRACT PREVIOUS CONVERSATION
         previous_conversation = messages[1:-1] if len(messages) > 2 else []
         clean_previous_history = []
         if previous_conversation:
@@ -261,7 +258,6 @@ class AgentNodes:
                     "role": role,
                     "content": msg.content
                 })
-        # 3. EXTRACT CURRENT QUERY
         current_query = messages[-1].content
         llm_payload = {
             "system_message": system_message,
@@ -282,18 +278,17 @@ class AgentNodes:
         llm = self.llm
         response = llm.invoke(messages_for_llm)
 
-        logger.info("############ ANSWER FROM PREVIOUS CONVO ############################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
+        
         logger.info(f"response content: {response}")
-        logger.info(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("############ ANSWER FROM PREVIOUS CONVO  ############################################")
+        logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
         return {"messages": [response]}
 
     def list_tables(self, state: MessagesState):
         """List available tables and load conversation history if available"""
         messages = []
         start_time = time.time()
+        logger.warning("************** LIST TABLE (MANUAL TOOL CALL) **************")
         table_list_tool_call = {
             "name": "sql_db_list_tables",
             "args": {"query": "" },
@@ -306,29 +301,27 @@ class AgentNodes:
         response = AIMessage(content = tool_message.content)
 
         messages.append(response)
-        logger.info("############ LIST TABLE (MANUAL TOOL CALL) ################################################################")
         logger.info(f"Tool Call  Message: {tool_call_message}")
         logger.info(f"Tool Message (Available tables): {tool_message.content}")
         logger.critical(f"list_tables node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.info("---------------------"*4)
         return {"messages": messages}
     
     def init_retry_count(self, state: MessagesState):
         state["retry_count"] = 0
         return {"messages": []}
   
-    # LLM based tool call generate schema only for query related tables (no manual tool call here)
     # LLM CALL 02_D
     def call_get_schema_llm(self, state: MessagesState):
         start_time = time.time()
+        logger.warning("**************  RELAVANT TABLE FETCH (LLM TOOL CALL) ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         llm = self.llm.bind_tools([self.toolkit.get_schema_tool_obj()], tool_choice="any")
         response = llm.invoke(state["messages"])
-        logger.info("############ RELAVANT TABLE FETCH (LLM TOOL CALL) #########################################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"GET Schema LLM Response: {response}")
         logger.critical(f"call_get_schema_llm node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.info("---------------------"*4)
         return {"messages": [response]}
     
   
@@ -336,6 +329,9 @@ class AgentNodes:
     def generate_query(self, state: MessagesState):
         """Generate SQL query from natural language"""
         start_time = time.time()
+        logger.warning("**************  GENERATE SQL QUERY ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         system_message = {
             "role": "system",
             "content": get_generate_query_prompt(self.db_dialect) + "\n\nReturn ONLY a SQL query. No explanations.",
@@ -345,14 +341,11 @@ class AgentNodes:
 
         llm = self.llm
         response = llm.invoke([system_message] + state["messages"])
-        logger.info("############ GENERATE SQL QUERY #####################################################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"Dialect: {self.db_dialect}")
         logger.info(f"SCHEMA FOR GENERATING SQL--->{state['messages'][-1].content}")
         logger.info(f"Generated Query Response: {response}")
         logger.critical(f"generate_query node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.info("---------------------"*4)
         return {"messages": [response]}
 
     # LLM CALL 04_D ( Adding SQL in metadata )
@@ -364,6 +357,9 @@ class AgentNodes:
             - metadata.sql_query: original SQL
         """
         start_time = time.time()
+        logger.warning("**************  CHECK QUERY ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         last_msg = state["messages"][-1]
         sql_query = last_msg.content.strip() if isinstance(last_msg.content, str) else None
         
@@ -376,8 +372,6 @@ class AgentNodes:
                     "metadata": {"sql_query": None}
                 }]
             }
-        
-        # IF SQL query is available than validate with the LLM.
         system_message = {
             "role": "system",
             "content": get_check_query_prompt(self.db_dialect)
@@ -386,13 +380,10 @@ class AgentNodes:
 
         response = self.llm.invoke([system_message, user_message])
         verdict = response.content.strip().upper()
-        logger.info("############ CHECK QUERY ################################################################################")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"SQL Query for Validation: {sql_query}")
         logger.info(f"Final verdict {verdict}")
-        logger.info(f"check query node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.critical(f"check query node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
 
         if verdict.startswith("VALID"):
             verdict = "VALID"
@@ -443,8 +434,7 @@ class AgentNodes:
             """
             start_time =  time.time()
             last_msg = state["messages"][-1]
-            logger.info("############ RUN QUERY (LLM TOOL CALL) #########################################################")
-            # Extract query from metadata
+            logger.warning("************** RUN QUERY ( TOOL CALL) **************")
             sql_query = None
             if hasattr(last_msg, "additional_kwargs"):
                 metadata = last_msg.additional_kwargs.get("metadata", {})
@@ -478,7 +468,7 @@ class AgentNodes:
             try:
                 result = run_tool.run({"query":sql_query})
                 logger.info(f"SQL QUERY RESULT: {result}")
-                logger.info(f"run query node completed in {time.time() - start_time:.2f} seconds")
+                logger.critical(f"run query node completed in {time.time() - start_time:.2f} seconds")
 
             except Exception as e:
                 return {
@@ -501,6 +491,9 @@ class AgentNodes:
     def generate_response(self, state: MessagesState):
         """Generate final answer to user based on query results"""
         start_time = time.time()
+        logger.warning("************** Generate Response ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
         system_message = {
             "role": "system",
             "content": get_generate_natural_response_prompt(),
@@ -524,16 +517,12 @@ class AgentNodes:
 
 
         response = llm.invoke(llm_messages)
-
-        logger.info("############ Generate Response ##############################################################################33")
-        logger.info("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
         logger.info(f"SQL query: {sql_query}")
         logger.info(f"Executed SQL Query Result: {last_msg_content}")
         logger.info(f"original user question: {self.user_query}")
         logger.info(f"Generated final Response: {response.content}")
         logger.critical(f"generate response node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*8)
+        logger.info("---------------------"*4)
         return {"messages": [response]}
  
 
