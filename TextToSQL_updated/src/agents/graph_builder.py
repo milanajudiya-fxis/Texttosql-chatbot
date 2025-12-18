@@ -137,6 +137,11 @@ class AgentGraphBuilder:
         """Stream agent execution"""
         return self.agent.stream(input_state, stream_mode=stream_mode)
 
+    async def astream(self, input_state, stream_mode="values"):
+        """Async stream agent execution"""
+        async for step in self.agent.astream(input_state, stream_mode=stream_mode):
+            yield step
+
 
 
 

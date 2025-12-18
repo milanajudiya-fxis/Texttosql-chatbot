@@ -6,10 +6,12 @@ from typing import Optional
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import MessagesState
 from src.tools import SQLToolkit
+from src.core.dependencies import get_redis_client
 from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt
 import time
 from langgraph.graph import END
 import requests
+from bs4 import BeautifulSoup
 import os
 from langchain_core.tools import tool
 
@@ -126,7 +128,99 @@ class AgentNodes:
         logger.info(f"Query: {user_query}")
         logger.info(f"Domain filter: {domain}")
         
+        # 1. DIRECT URL SCRAPING (Optimization)
+        # Map topics to specific URLs to skip search engine latency/flakiness
+        direct_urls = {
+            "schedule": "https://siciliangames.com/schedule.php",
+            "fixtures": "https://siciliangames.com/schedule.php",
+            "winner": "https://siciliangames.com/winners.php",
+            "sponsor": "https://siciliangames.com/index.php",
+            "partners": "https://siciliangames.com/index.php",
+            "owner": "https://siciliangames.com/about.php",
+            "organizer": "https://siciliangames.com/about.php",
+            "contact": "https://siciliangames.com/contact.php",
+            "register": "https://siciliangames.com/registration.php"
+        }
 
+        # Check if query matches any topic
+        target_url = None
+        for key, url in direct_urls.items():
+            if key in user_query.lower():
+                target_url = url
+                break
+        
+        if target_url:
+            logger.info(f"Targeting specific URL: {target_url}")
+            try:
+                # 1.1 Check Cache for this specific URL
+                redis_client = get_redis_client()
+                cache_key = f"web_scrape:{target_url}"
+                cached_content = None
+                if redis_client:
+                    cached_content = redis_client.get(cache_key)
+                
+                content_text = ""
+                if cached_content:
+                    logger.info("RETRIEVED URL CONTENT FROM CACHE")
+                    content_text = cached_content
+                else:
+                    logger.info("FETCHING URL CONTENT DIRECTLY")
+                    resp = requests.get(target_url, timeout=10)
+                    resp.raise_for_status()
+                    soup = BeautifulSoup(resp.content, 'html.parser')
+                    
+                    # Remove script/style
+                    for script in soup(["script", "style"]):
+                        script.decompose()
+                    
+                    content_text = soup.get_text(separator=' ', strip=True)
+                    # Limit content size to avoid token overflow (approx 1500 words)
+                    content_text = " ".join(content_text.split()[:2500])
+                    
+                    # Cache the scraped text
+                    if redis_client and content_text:
+                        redis_client.setex(cache_key, 86400, content_text) # 24h cache
+
+                # 1.2 Generate Answer from Content
+                if content_text:
+                    logger.info("Generate Answer from Scraped Content")
+                    # Use a simplified prompt for summarization
+                    scrape_prompt = f"""
+                    You are a helpful assistant. 
+                    The user asked: "{user_query}"
+                    
+                    Here is the content from {target_url}:
+                    {content_text}
+                    
+                    Answer the user's question using ONLY the provided content. 
+                    If the answer is found, format it nicely. 
+                    If the answer is NOT in the content, say "NOT_FOUND".
+                    """
+                    
+                    llm_response = self.llm.invoke([{"role": "user", "content": scrape_prompt}])
+                    answer = llm_response.content
+                    
+                    if "NOT_FOUND" not in answer:
+                         return {
+                            "messages": [
+                                AIMessage(
+                                    content=answer,
+                                    additional_kwargs={
+                                        "source": "direct_scrape",
+                                        "url": target_url,
+                                        "query": user_query
+                                    }
+                                )
+                            ]
+                        }
+                    else:
+                        logger.warning("Answer not found in scraped content, falling back to search")
+
+            except Exception as e:
+                logger.error(f"Direct scraping failed: {e}")
+                # Fallback to normal search
+
+        # 2. CHECK REDIS CACHE (for generic search)
         def extract_answer_from_response(response):
             content = getattr(response, "content", None)
             if not content or not isinstance(content, list):

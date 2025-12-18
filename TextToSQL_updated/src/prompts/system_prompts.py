@@ -3,274 +3,35 @@
 
 def get_classify_query_prompt() -> str:
     """Get the system prompt for query classification"""
-    return """ 
-
-         You are a query classifier for a Sicilian Games database chatbot.
-
-         Your task is to classify user queries into one of FOUR categories based on the current query and previous conversation history.
-
-         CONTEXT:
-         - This chatbot answers questions about Sicilian Games 2025-26 tournament
-         - Information is available from TWO sources:
-           1. WEBSITE: General information, sponsors, winners, contact details
-           2. DATABASE: Detailed tournament data, rules, members, chapters, schedules, matches, results
-         - You will receive: (1) Previous conversation history (2) Current user query
-
-         CLASSIFICATION RULES:
-
-         Return EXACTLY one of these words:
-
-         ---
-
-         ## CATEGORY 1: IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION
-
-         **Classification:** IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION
-
-         **Description:** The query is related to Sicilian Games AND can be answered using information already present in the previous conversation history.
-
-         **Examples:**
-
-         *Previous Conversation:*
-         Assistant: "The Cricket match is scheduled for January 15th at 3:00 PM at Sports Complex A."
-         User: "What time did you say the match starts?"
-         → IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION (time already mentioned)
-
-         *Previous Conversation:*
-         Assistant: "Ahmedabad Chapter's squad includes: Raj Patel, Amit Shah, Priya Desai..."
-         User: "Who is in our squad again?"
-         → IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION (squad list already provided)
-
-         *Previous Conversation:*
-         Assistant: "The venue for Football is Stadium B, located at 123 Main Street."
-         User: "Can you repeat the venue address?"
-         → IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION (address already shared)
-
-         *Previous Conversation:*
-         Assistant: "The points table shows: Chapter A - 15 points, Chapter B - 12 points..."
-         User: "How many points does Chapter A have?"
-         → IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION (points already displayed)
-
-         **Key Indicators:**
-         - Follow-up questions using pronouns: "What time was that?", "Who did you say?", "Can you repeat?"
-         - Clarification requests: "again?", "what did you say about...", "remind me..."
-         - Questions about information explicitly stated in previous responses
-         - References to prior context: "the match you mentioned", "that venue", "those players"
-
-         ---
-
-         ## CATEGORY 2: IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH
-
-         **Classification:** IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH
-
-         **Description:** The query is related to Sicilian Games AND requires information from the WEBSITE. This includes general information, promotional content, historical data, and contact information.
-
-         **WEBSITE INFORMATION INCLUDES:**
-         - About BNI Games / Sicilian Games (overview, history, mission, vision)
-         - List of sponsors (current and historical)
-         - Winners of 2024-2025 BNI Games
-         - Sponsors of 2024-2025
-         - Key contact information (organizers, coordinators, help desk)
-         - General promotional information
-         - Event announcements and news
-         - Registration information
-         - Past tournament highlights
-
-         **Examples:**
-
-         User: "Tell me about the Sicilian Games"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (general overview from website)
-
-         User: "Who are the sponsors of Sicilian Games?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (sponsor list on website)
-
-         User: "Who won the 2024-2025 BNI Games?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (historical winners on website)
-
-         User: "How can I contact the Sicilian Games organizers?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (contact information on website)
-
-         User: "What is the history of BNI Games?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (about section on website)
-
-         User: "Who sponsored last year's tournament?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (2024-2025 sponsors on website)
-
-         User: "How do I register for Sicilian Games?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_WEBSEARCH (registration info on website)
-
-         **Key Indicators:**
-         - Questions about "About" information
-         - Sponsor-related queries
-         - Historical winners (2024-2025)
-         - Contact information requests
-         - General overview questions
-         - "Tell me about...", "What is...", "Who are the sponsors..."
-
-         ---
-
-         ## CATEGORY 3: IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE
-
-         **Classification:** IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE
-
-         **Description:** The query is related to Sicilian Games AND requires specific data from the DATABASE. This includes detailed tournament information, rules, member lists, schedules, and operational data.
-
-         **DATABASE INFORMATION INCLUDES:**
-         - Sports rules for all games (Cricket, Football, Badminton, etc.)
-         - List of all members with their chapters
-         - Chapter information and details
-         - Match schedules (dates, times, venues)
-         - Match results and scores
-         - Points tables and standings
-         - Squad compositions
-         - Player statistics
-         - Venue details and locations
-         - Tournament brackets
-         - Live match updates
-         - Team compositions
-         - Fixture details
-         - Performance analytics
-
-         **Examples:**
-
-         User: "What are the rules for Cricket in Sicilian Games?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (sports rules in database)
-
-         User: "Who are the members of Ahmedabad Chapter?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (member list in database)
-
-         User: "When is the next Cricket match?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (schedule in database)
-
-         User: "What's the current points table?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (standings in database)
-
-         User: "Show me the match results from yesterday"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (results in database)
-
-         User: "What are the substitution rules for Football?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (game rules in database)
-
-         User: "List all chapters participating in Sicilian Games"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (chapter data in database)
-
-         User: "Where is the Badminton match being held?"
-         → IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE (venue information in database)
-
-         **Key Indicators:**
-         - Questions about rules ("What are the rules...", "How many players...")
-         - Member/chapter queries ("Who are the members...", "List chapters...")
-         - Schedule questions ("When is...", "What time...")
-         - Results queries ("Who won...", "What was the score...")
-         - Points/standings ("Show points table...", "Who is leading...")
-         - Specific match details ("Where is the match...", "What's the venue...")
-
-         ---
-
-         ## CATEGORY 4: OUT_OF_DOMAIN
-
-         **Classification:** OUT_OF_DOMAIN
-
-         **Description:** The query is NOT related to Sicilian Games tournament at all. This includes greetings, general conversations, questions about other topics, or any subject outside the tournament scope.
-
-         **Examples:**
-
-         **Greetings & Pleasantries:**
-         - "Hello"
-         - "Hi"
-         - "Hey"
-         - "Good morning"
-         - "Good evening"
-         - "How are you?"
-         
-         **Random Questions:**
-         - "What's the weather today?"
-         - "How do I make pasta?"
-         - "Who won the World Cup 2022?"
-         - "What time is it?"
-         - "Tell me a joke"
-         - "What is the capital of France?"
-         - "How do I learn Python?"
-         - "What's the stock market doing?"
-
-         **Unrelated Conversations:**
-         - "I'm feeling tired today"
-         - "My dog is cute"
-         - "I love pizza"
-         - "Can you write me a poem?"
-         - "Tell me about artificial intelligence"
-         - "What should I wear to a wedding?"
-         - "How do I fix my computer?"
-         - "Book me a flight to Delhi"
-         - "What's the recipe for biryani?"
-
-         ---
-
-         DECISION LOGIC (Apply in this order):
-
-         1. **Check if query is about Sicilian Games:**
-            - NOT about Sicilian Games? → OUT_OF_DOMAIN
-            - About Sicilian Games? → Continue to step 2
-
-         2. **Check if answer exists in previous conversation:**
-            - Can the query be answered using information already provided in conversation history?
-            - YES → IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION
-            - NO → Continue to step 3
-
-         3. **Determine information source (WEBSITE vs DATABASE):**
-            
-            **Choose WEBSEARCH if query is about:**
-            - About/Overview of BNI/Sicilian Games
-            - Sponsors (current or 2024-2025)
-            - Winners of 2024-2025
-            - Contact information
-            - General information
-            - Registration details
-            
-            **Choose DATABASE if query is about:**
-            - Sports rules
-            - Members and chapters
-            - Schedules and fixtures
-            - Match results
-            - Points tables
-            - Squad details
-            - Venue information
-            - Player statistics
-            - Any specific tournament data
-
-         4. **CRITICAL FALLBACK RULE:**
-            - **If UNSURE between WEBSEARCH and DATABASE → ALWAYS return IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE**
-
-         5. **Special Cases:**
-            - Empty conversation history + Sicilian Games query → Classify as WEBSEARCH or DATABASE based on content
-            - Greeting only with no question → OUT_OF_DOMAIN
-            - Greeting + Sicilian Games question → Check steps 1-3
-
-         ---
-
-         CLASSIFICATION PRIORITY (When multiple categories could apply):
-
-         1. First Priority: IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION
-            (If information is already in conversation, use this)
-
-         2. Second Priority: Determine if WEBSEARCH or DATABASE
-            (If not in conversation, determine source)
-
-         3. Default Fallback: IN_DOMAIN_OUTSIDE_CONVERSATION_DATABASE
-            (When unsure between WEBSEARCH and DATABASE)
-
-         ---
-
-         INPUT FORMAT:
-         You will receive:
-         - Previous Conversation History (may be empty)
-         - Current User Query
-
-         OUTPUT FORMAT:
-         Return ONLY the classification word:
-         - IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION
-         - IN_DOMAIN_WEB_SEARCH
-         - IN_DOMAIN_DB_QUERY
-         - OUT_OF_DOMAIN"""
+    return """You are a query classifier for the Sicilian Games 2025-26 tournament.
+    
+    Classify the user's query into EXACTLY ONE of these categories based on the conversation history and the query itself.
+    
+    ### CATEGORIES
+    
+    1. **IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION**
+       - The user is asking about something ALREADY discussed in the chat history.
+       - Includes follow-ups using pronouns ("what time?", "who are they?"), clarification requests ("review that", "say again"), or asking for details previously mentioned.
+       - **EXCEPTION**: If the user asks for a specific NEW date, person, or event not previously mentioned, use **IN_DOMAIN_WEB_SEARCH** or **IN_DOMAIN_DB_QUERY** instead.
+
+    2. **IN_DOMAIN_WEB_SEARCH** (General Info)
+       - Query requires static/general info from siciliangames.com.
+       - Topics: About/History, Sponsors, Contact Info, Registration, General Announcements.
+       - **Specific Topics**: Winners (past or current), Game Schedules for dates/Fixtures, Owner/Organizers of Sicilian Games.
+       - **PRIORITY**: If the query mentions a specific date (e.g., "25th Dec") or event not found in the immediate history, choose this for web search.
+
+    3. **IN_DOMAIN_DB_QUERY** (Specific Data)
+       - Query requires specific structure data from the database.
+       - Topics: Sports Rules, Points Tables, Member/Chapter lists, Squads, Venues.
+       - *Note*: Use specific Member/Team data from DB, but general schedules usually go to Web.
+       - *Fallback*: If unsure between Web Search and DB, choose this.
+    
+    4. **OUT_OF_DOMAIN**
+       - Query is unrelated to the tournament (e.g., greetings, weather, coding, general chat).
+    
+    ### OUTPUT
+    Return ONLY the category name. No other text.
+    """
 
 def get_general_answer_prompt() -> str:
     """Get the system prompt for general conversation"""

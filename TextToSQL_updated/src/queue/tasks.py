@@ -114,12 +114,16 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str):
         # Save user message
         conversation_manager.save_message(thread_id, "user", body)
         
-        # Initialize components
-        db_manager = DatabaseManager(settings)
+        # Initialize components (using cached dependencies)
+        from src.core.dependencies import get_db_manager, get_llm_manager
+        
+        logger.info("Getting cached DatabaseManager")
+        db_manager = get_db_manager()
         db = db_manager.get_database()
         dialect = db_manager.get_dialect()
         
-        llm_manager = LLMManager(settings)
+        logger.info("Getting cached LLMManager")
+        llm_manager = get_llm_manager()
         llm = llm_manager.get_model()
         
         toolkit = SQLToolkit(db, llm)
