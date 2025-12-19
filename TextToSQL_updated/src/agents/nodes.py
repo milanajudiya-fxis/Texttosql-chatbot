@@ -65,7 +65,7 @@ class AgentNodes:
         logger.info("---------------------"*4)
         return state
     
-    # LLM CALL 01 (SAME PROMPT FOR ALL)
+    # LLM CALL 01 
     def classify_query(self, state: MessagesState):
         """Classify whether query is related to database or general question."""
         start_time = time.time()
@@ -86,6 +86,7 @@ class AgentNodes:
         # 3. EXTRACT CURRENT QUERY
         current_query = messages[-1].content
         self.user_query = current_query
+        logger.warning(f"Current query: {current_query}")
         llm_payload = {
             "system_message": system_message,
             "previous_conversation": clean_previous_history,
@@ -344,6 +345,7 @@ class AgentNodes:
         messages = state["messages"]
         system_message = get_answer_from_previous_convo_prompt()
         previous_conversation = messages[1:-1] if len(messages) > 2 else []
+    
         clean_previous_history = []
         if previous_conversation:
             for msg in previous_conversation:
@@ -352,7 +354,8 @@ class AgentNodes:
                     "role": role,
                     "content": msg.content
                 })
-        current_query = messages[-1].content
+        current_query = self.user_query
+        logger.warning(f"Current query: {current_query}")
         llm_payload = {
             "system_message": system_message,
             "previous_conversation": clean_previous_history,

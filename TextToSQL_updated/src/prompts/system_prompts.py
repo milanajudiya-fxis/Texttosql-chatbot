@@ -31,6 +31,11 @@ def get_classify_query_prompt() -> str:
     
     ### OUTPUT
     Return ONLY the category name. No other text.
+
+    ### ADDITIONAL RULE:
+
+   - If the user asks about a specific person, team, chapter, or entity that was mentioned in a previous conversation but the model previously indicated it has NO information (e.g., "I don't have any information about X"), then treat the query as requiring **IN_DOMAIN_DB_QUERY** (if it is structured data like member/team lists) or **IN_DOMAIN_WEB_SEARCH** (if general/public info). Do NOT classify it as IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION, since there is no resolved info yet.
+    
     """
 
 def get_general_answer_prompt() -> str:
@@ -191,6 +196,8 @@ def get_web_search_prompt() -> str:
       - Never reference "website," "site," "page," "searching," "checking," or any technical process
       - No citations or references - just natural conversation
       - Use 1-2 emojis per message to keep it warm and friendly
+
+      
     """
 
 # Text to SQL Prompt 
