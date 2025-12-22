@@ -49,10 +49,9 @@ class LLMManager:
                     timeout=self.settings.llm_without_reasoning.timeout,
                     max_retries=self.settings.llm_without_reasoning.max_retries,
                     api_key=self.settings.llm_without_reasoning.api_key,
-                    reasoning_effort=self.settings.llm_without_reasoning.reasoning_effort,
                 )
                 logger.critical(f"Successfully initialized LLM without reasoning: {self.settings.llm_without_reasoning.model}")
-                logger.critical(f"LLM without reasoning reasoning effort: {self.settings.llm_without_reasoning.reasoning_effort}")
+
             
         except Exception as e:
             logger.error(f"Failed to initialize LLM: {e}", exc_info=True)

@@ -106,7 +106,7 @@ class AgentNodes:
             }
         ]
         llm = self.llm_without_reasoning
-        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
+        logger.critical(f"llm --> gpt-4.1-mini")
         response = llm.invoke(messages_for_llm)
         decision = response.content.strip().upper()
         logger.info(f"Classification result: {decision}")
@@ -137,12 +137,13 @@ class AgentNodes:
             "schedule": "https://siciliangames.com/schedule.php",
             "fixtures": "https://siciliangames.com/schedule.php",
             "winner": "https://siciliangames.com/winners.php",
+            "winner-24-25": "https://siciliangames.com/sicilian-24.php",
             "sponsor": "https://siciliangames.com/index.php",
             "partners": "https://siciliangames.com/index.php",
-            "owner": "https://siciliangames.com/about.php",
-            "organizer": "https://siciliangames.com/about.php",
-            "contact": "https://siciliangames.com/contact.php",
-            "register": "https://siciliangames.com/registration.php"
+            "organizer": "https://siciliangames.com/index.php",
+            "standings":"https://siciliangames.com/standing.php",
+            "contact": "https://siciliangames.com/contact.html",
+            "sicilian 2024-25": "https://siciliangames.com/sicilian-24.php"
         }
 
         # Check if query matches any topic
@@ -323,7 +324,7 @@ class AgentNodes:
         if not user_msg:
             logger.error("No human message found in state")
             return {"messages": []}
-        llm = self.llm
+        llm = self.llm_without_reasoning
         messages_for_llm = [
             {"role": "system", "content": 
              get_general_answer_prompt()},
@@ -441,7 +442,7 @@ class AgentNodes:
         }
 
         llm = self.llm_without_reasoning
-        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
+        logger.critical(f"llm --> gpt-4.1-mini")
         response = llm.invoke([system_message] + state["messages"])
         logger.info(f"Dialect: {self.db_dialect}")
         logger.info(f"SCHEMA FOR GENERATING SQL--->{state['messages'][-1].content}")
@@ -480,7 +481,7 @@ class AgentNodes:
         }
         user_message = { "role": "user", "content": sql_query }
         llm = self.llm_without_reasoning
-        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
+        logger.critical(f"llm --> gpt-4.1-mini")
         response = llm.invoke([system_message, user_message])
         verdict = response.content.strip().upper()
         logger.info(f"SQL Query for Validation: {sql_query}")
@@ -512,6 +513,8 @@ class AgentNodes:
         last_msg = state["messages"][-1]
         verdict = last_msg.content.strip().upper()
         logger.warning("**************  SHOULD CONTINUE ************** ")
+
+        logger.warning(f"state: {state}")
         # Ensure retry counter exists
         if "retry_count" not in state:
             state["retry_count"] = 0
@@ -604,7 +607,7 @@ class AgentNodes:
         }
 
         llm = self.llm_without_reasoning
-        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
+        logger.critical(f"llm --> gpt-4.1-mini")
         last_msg_obj = state["messages"][-1]
         last_msg_content = state["messages"][-1].content
         sql_query = None

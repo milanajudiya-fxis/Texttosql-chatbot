@@ -16,7 +16,7 @@ def get_classify_query_prompt() -> str:
 
     2. **IN_DOMAIN_WEB_SEARCH** (General Info)
        - Query requires static/general info from siciliangames.com.
-       - Topics: About/History, Sponsors, Contact Info, Registration, General Announcements.
+       - Topics: About/History, Sponsors, Contact Info, Registration, General Announcements, team standings.
        - **Specific Topics**: Winners (past or current), Game Schedules for dates/Fixtures, Owner/Organizers of Sicilian Games.
        - **PRIORITY**: If the query mentions a specific date (e.g., "25th Dec") or event not found in the immediate history, choose this for web search.
 
