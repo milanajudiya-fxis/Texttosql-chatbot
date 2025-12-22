@@ -101,6 +101,7 @@ class AgentGraphBuilder:
         # Web search now ends after searching, no fallback to DB
         builder.add_edge("web_search", END)
         
+        
         builder.add_edge("list_db_tables", "call_get_schema")
         builder.add_edge("call_get_schema", "get_schema")
         builder.add_edge("get_schema", "init_retry_count")
@@ -118,11 +119,7 @@ class AgentGraphBuilder:
         builder.add_edge("run_custom_query", "generate_response")
         builder.add_edge("generate_response", END)
         self.agent = builder.compile()
-        
-        # png_bytes = self.agent.get_graph().draw_mermaid_png()
-        # with open("agent_flow.png", "wb") as f:
-        #     f.write(png_bytes)  
-        # logger.info("Agent graph built successfully")
+        logger.info("Agent graph built successfully")
 
         # png_bytes = self.agent.get_graph().draw_mermaid_png(
         # draw_method=MermaidDrawMethod.PYPPETEER)
@@ -139,6 +136,11 @@ class AgentGraphBuilder:
     def stream(self, input_state, stream_mode="values"):
         """Stream agent execution"""
         return self.agent.stream(input_state, stream_mode=stream_mode)
+
+    async def astream(self, input_state, stream_mode="values"):
+        """Async stream agent execution"""
+        async for step in self.agent.astream(input_state, stream_mode=stream_mode):
+            yield step
 
 
 

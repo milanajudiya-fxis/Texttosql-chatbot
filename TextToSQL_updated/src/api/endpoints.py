@@ -56,6 +56,16 @@ async def health():
     }
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize resources on startup"""
+    logger.info("Application startup: Pre-loading resources...")
+    from src.api.dependencies import get_db_manager, get_llm_manager
+    # Pre-warm the singletons
+    get_db_manager()
+    get_llm_manager()
+    logger.info("Application startup: Resources loaded")
+
 @app.post("/query", response_model=QueryResponse)
 async def process_query(request: QueryRequest):
     """
@@ -73,35 +83,37 @@ async def process_query(request: QueryRequest):
             logger.info(f"Using thread_id: {request.thread_id}")
         
         # Load settings
-        logger.debug("Loading application settings")
-        settings = Settings.from_env()
+        # logger.debug("Loading application settings")
+        # settings = Settings.from_env()
+        
+        # Get cached dependencies
+        from src.api.dependencies import get_db_manager, get_llm_manager, get_toolkit
         
         # Initialize conversation manager if thread_id is provided
         conversation_manager = None
         if request.thread_id:
+            # We still need settings for this one, or we can make it a dependency too
+            settings = Settings.from_env() 
             logger.info(f"Initializing conversation manager for thread: {request.thread_id}")
             conversation_manager = ConversationManager(settings)
             # Save user message
             conversation_manager.save_message(request.thread_id, "user", request.question)
             logger.debug("User message saved to conversation thread")
         
-        # Initialize database
-        logger.info("1: Initializing database manager")
-        db_manager = DatabaseManager(settings)
+        # Get resources from dependencies (cached)
+        logger.info("1: Getting database manager (cached)")
+        db_manager = get_db_manager()
         db = db_manager.get_database()
         dialect = db_manager.get_dialect()
-        logger.debug(f"Database initialized with dialect: {dialect}")
         
-        # Initialize LLM
-        logger.info("2: Initializing LLM manager")
-        llm_manager = LLMManager(settings)
-        llm = llm_manager.get_model()
-        logger.debug("LLM initialized and ready")
+        logger.info("2: Getting LLM manager (cached)")
+        llm_manager = get_llm_manager()
+        # llm = llm_manager.get_model() # Not needed directly if using toolkit
         
         # Initialize toolkit
-        logger.info("3: Initializing SQL toolkit")
-        toolkit = SQLToolkit(db, llm)
-        logger.debug("SQL toolkit initialized with available tools")
+        logger.info("3: Getting SQL toolkit")
+        # Reuse the toolkit creation logic or get from dependency
+        toolkit = get_toolkit(db_manager, llm_manager)
         
         # Build agent graph with conversation memory
         logger.info("4: Building agent graph")
@@ -111,13 +123,13 @@ async def process_query(request: QueryRequest):
             conversation_manager=conversation_manager,
             thread_id=request.thread_id
         )
-        logger.debug("Agent graph built successfully")
+        # logger.debug("Agent graph built successfully")
         
         # Collect the response
         logger.info("5: Executing agent stream")
         messages = []
         step_count = 0
-        for step in agent_builder.stream(
+        async for step in agent_builder.astream(
             {"messages": [{"role": "user", "content": request.question}]},
             stream_mode="values",
         ):
@@ -162,26 +174,6 @@ async def test_endpoint():
     }
 
 
-def split_message(message: str, max_length: int = 1600) -> list[str]:
-    """
-    Split message into chunks <= max_length without breaking words.
-    """
-    parts = []
-    current = ""
-
-    for word in message.split(" "):
-        # +1 for space
-        if len(current) + len(word) + 1 > max_length:
-            parts.append(current.strip())
-            current = word
-        else:
-            current += " " + word if current else word
-
-    if current:
-        parts.append(current.strip())
-
-    return parts
-
 
 @app.post("/webhook/whatsapp")
 async def whatsapp_webhook(
@@ -196,6 +188,7 @@ async def whatsapp_webhook(
     enqueues them for background processing, and returns immediately.
     """
     try:
+        start_time = time.time()
         logger.info(f"Incoming message from {From}: '{Body[:100]}...'")
         
         # Load settings
@@ -218,6 +211,7 @@ async def whatsapp_webhook(
         # We return an empty TwiML response so Twilio doesn't send anything back immediately
         # The worker will send the actual response asynchronously
         resp = MessagingResponse()
+        logger.critical(f"Task enqueued successfully in {time.time() - start_time:.2f}s")
         return str(resp)
         
     except Exception as e:

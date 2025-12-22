@@ -14,3 +14,5 @@ python-multipart==0.0.20
 pyppeteer==2.0.0
 redis>=5.0.0
 rq>=1.15.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0

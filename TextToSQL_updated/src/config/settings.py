@@ -22,7 +22,20 @@ class DatabaseConfig:
 
 @dataclass
 class LLMConfig:
-    """LLM configuration"""
+    """LLM configuration with reasoning support"""
+    model: str
+    temperature: float
+    max_tokens: Optional[int]
+    timeout: Optional[float]
+    max_retries: int
+    api_key: str
+    reasoning_effort: str = None   
+    max_reasoning_tokens: int = None
+
+
+@dataclass
+class LLMWithoutReasoningConfig:
+    """LLM configuration without reasoning support"""
     model: str
     temperature: float
     max_tokens: Optional[int]
@@ -62,6 +75,7 @@ class Settings:
     """Application settings"""
     database: DatabaseConfig
     llm: LLMConfig
+    llm_without_reasoning: LLMWithoutReasoningConfig
     twilio: TwilioConfig
     redis: RedisConfig
     debug: bool = False
@@ -84,8 +98,19 @@ class Settings:
             timeout=None,
             max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
             api_key=os.getenv("OPENAI_API_KEY", ""),
-            reasoning_effort = os.getenv("LLM_REASONING_EFFORT", "low"),
-            max_reasoning_tokens= int(os.getenv("LLM_MAX_REASONING_TOKENS", "0"))
+            reasoning_effort=os.getenv("LLM_REASONING_EFFORT", "low"),
+            max_reasoning_tokens=int(os.getenv("LLM_MAX_REASONING_TOKENS", "0"))
+            )
+            
+        llm_without_reasoning_config = LLMWithoutReasoningConfig(
+            model=os.getenv("LLM_WITHOUT_REASONING_MODEL", "gpt-4o-mini"),
+            temperature=float(os.getenv("LLM_WITHOUT_REASONING_TEMPERATURE", "0")),
+            max_tokens=None,
+            timeout=None,
+            max_retries=int(os.getenv("LLM_WITHOUT_REASONING_MAX_RETRIES", "2")),
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+            reasoning_effort=os.getenv("LLM_WITHOUT_REASONING_EFFORT", None),
+            max_reasoning_tokens=int(os.getenv("LLM_WITHOUT_MAX_REASONING_TOKENS", "0"))
             )
             
         twilio_config = TwilioConfig(
@@ -104,6 +129,7 @@ class Settings:
         return cls(
             database=db_config,
             llm=llm_config,
+            llm_without_reasoning=llm_without_reasoning_config,
             twilio=twilio_config,
             redis=redis_config,
             debug=os.getenv("DEBUG", "False").lower() == "true",
