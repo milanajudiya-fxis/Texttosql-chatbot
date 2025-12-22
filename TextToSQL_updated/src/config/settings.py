@@ -56,20 +56,20 @@ class TwilioConfig:
 
 @dataclass
 class RedisConfig:
-    """Redis configuration"""
     host: str
     port: int
     db: int
     password: Optional[str] = None
-    socket_timeout: int = 5
-    socket_connect_timeout: int = 5
-    
+    url_override: Optional[str] = None
+
     @property
     def url(self) -> str:
-        """Generate Redis URL"""
+        if self.url_override:
+            return self.url_override
         if self.password:
             return f"redis://:{self.password}@{self.host}:{self.port}/{self.db}"
         return f"redis://{self.host}:{self.port}/{self.db}"
+
 
 
 @dataclass
@@ -126,8 +126,9 @@ class Settings:
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
             password=os.getenv("REDIS_PASSWORD", None),
-            socket_timeout=int(os.getenv("REDIS_SOCKET_TIMEOUT", "5")),
-            socket_connect_timeout=int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5")),
+            url_override=os.getenv("REDIS_URL"),
+            # socket_timeout=int(os.getenv("REDIS_SOCKET_TIMEOUT", "5")),
+            # socket_connect_timeout=int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5")),
         )
 
         return cls(
