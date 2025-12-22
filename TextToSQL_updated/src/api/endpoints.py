@@ -11,6 +11,7 @@ from twilio.rest import Client
 import os
 import time
 from redis import Redis
+from redis.exceptions import ConnectionError, TimeoutError
 from rq import Queue
 from src.config import Settings
 from src.core import DatabaseManager, LLMManager, ConversationManager
@@ -36,6 +37,27 @@ class QueryResponse(BaseModel):
     success: bool
     result: Optional[str] = None
     error: Optional[str] = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Verify external connections on startup"""
+    try:
+        settings = Settings.from_env()
+        logger.info(f"Startup: Connecting to Redis at {settings.redis.host}:{settings.redis.port}")
+        
+        # Test Redis connection with short timeout
+        redis_conn = Redis.from_url(
+            settings.redis.url,
+            socket_timeout=settings.redis.socket_timeout,
+            socket_connect_timeout=settings.redis.socket_connect_timeout
+        )
+        redis_conn.ping()
+        logger.info("Startup: Successfully connected to Redis")
+        
+    except Exception as e:
+        logger.critical(f"Startup: Failed to connect to Redis: {e}")
+        # We don't raise here to allow the app to start, but it's critical info
 
 
 @app.get("/")
@@ -195,8 +217,15 @@ async def whatsapp_webhook(
         settings = Settings.from_env()
         
         # Connect to Redis
-        redis_conn = Redis.from_url(settings.redis.url)
+        redis_conn = Redis.from_url(
+            settings.redis.url,
+            socket_timeout=settings.redis.socket_timeout,
+            socket_connect_timeout=settings.redis.socket_connect_timeout
+        )
         q = Queue(connection=redis_conn)
+        
+        logger.info("Attempting to enqueue task...")
+        enqueue_start = time.time()
         
         # Enqueue the task
         job = q.enqueue(
@@ -205,13 +234,19 @@ async def whatsapp_webhook(
             job_timeout='5m'
         )
         
-        logger.info(f"Task enqueued with ID: {job.id}")
+        logger.info(f"Task enqueued successfully with ID: {job.id} (took {time.time() - enqueue_start:.2f}s)")
         
         # Return immediate response to Twilio
         # We return an empty TwiML response so Twilio doesn't send anything back immediately
         # The worker will send the actual response asynchronously
         resp = MessagingResponse()
         logger.critical(f"Task enqueued successfully in {time.time() - start_time:.2f}s")
+        return str(resp)
+        
+    except (ConnectionError, TimeoutError) as e:
+        logger.error(f"Redis connection error handling WhatsApp message: {e}")
+        resp = MessagingResponse()
+        resp.message("System busy. Please try again later.")
         return str(resp)
         
     except Exception as e:

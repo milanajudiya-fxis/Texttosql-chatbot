@@ -61,6 +61,8 @@ class RedisConfig:
     port: int
     db: int
     password: Optional[str] = None
+    socket_timeout: int = 5
+    socket_connect_timeout: int = 5
     
     @property
     def url(self) -> str:
@@ -124,6 +126,8 @@ class Settings:
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
             password=os.getenv("REDIS_PASSWORD", None),
+            socket_timeout=int(os.getenv("REDIS_SOCKET_TIMEOUT", "5")),
+            socket_connect_timeout=int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5")),
         )
 
         return cls(
