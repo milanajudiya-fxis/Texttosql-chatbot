@@ -34,6 +34,7 @@ class AgentNodes:
         self.toolkit = toolkit
         self.db_dialect = db_dialect
         self.llm = toolkit.llm
+        self.llm_without_reasoning = toolkit.llm_without_reasoning
         self.conversation_manager = conversation_manager
         self.thread_id = thread_id
         self.max_check_attempts = max_check_attempts
@@ -104,7 +105,8 @@ class AgentNodes:
                 "content": llm_payload["current_query"]
             }
         ]
-        llm = self.llm
+        llm = self.llm_without_reasoning
+        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
         response = llm.invoke(messages_for_llm)
         decision = response.content.strip().upper()
         logger.info(f"Classification result: {decision}")
@@ -306,7 +308,6 @@ class AgentNodes:
                 ]
         }
 
-
     # LLM CALL 02_A
     def answer_general(self, state: MessagesState):
         """Answer non-database related user questions normally."""
@@ -381,6 +382,10 @@ class AgentNodes:
         logger.info("---------------------"*4)
         return {"messages": [response]}
 
+
+
+
+
     def list_tables(self, state: MessagesState):
         """List available tables and load conversation history if available"""
         messages = []
@@ -414,7 +419,8 @@ class AgentNodes:
         logger.warning("**************  RELAVANT TABLE FETCH (LLM TOOL CALL) ************** ")
         logger.warning("LLM call:" + str(self.llm_call))
         self.llm_call += 1
-        llm = self.llm.bind_tools([self.toolkit.get_schema_tool_obj()], tool_choice="any")
+        llm = self.llm
+        llm = llm.bind_tools([self.toolkit.get_schema_tool_obj()], tool_choice="any")
         response = llm.invoke(state["messages"])
         logger.info(f"GET Schema LLM Response: {response}")
         logger.critical(f"call_get_schema_llm node completed in {time.time() - start_time:.2f} seconds")
@@ -433,10 +439,9 @@ class AgentNodes:
             "role": "system",
             "content": get_generate_query_prompt(self.db_dialect) + "\n\nReturn ONLY a SQL query. No explanations.",
         }
-        # running the run query tool within the generate_query node to allow LLM to use it for generating better queries
-        # llm = self.llm.bind_tools([self.toolkit.get_run_query_tool_obj()])
 
-        llm = self.llm
+        llm = self.llm_without_reasoning
+        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
         response = llm.invoke([system_message] + state["messages"])
         logger.info(f"Dialect: {self.db_dialect}")
         logger.info(f"SCHEMA FOR GENERATING SQL--->{state['messages'][-1].content}")
@@ -474,10 +479,12 @@ class AgentNodes:
             "content": get_check_query_prompt(self.db_dialect)
         }
         user_message = { "role": "user", "content": sql_query }
-
-        response = self.llm.invoke([system_message, user_message])
+        llm = self.llm_without_reasoning
+        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
+        response = llm.invoke([system_message, user_message])
         verdict = response.content.strip().upper()
         logger.info(f"SQL Query for Validation: {sql_query}")
+        logger.info(f"LLM Response: {response}")
         logger.info(f"Final verdict {verdict}")
         logger.critical(f"check query node completed in {time.time() - start_time:.2f} seconds")
         logger.info("---------------------"*4)
@@ -504,7 +511,7 @@ class AgentNodes:
 
         last_msg = state["messages"][-1]
         verdict = last_msg.content.strip().upper()
-        
+        logger.warning("**************  SHOULD CONTINUE ************** ")
         # Ensure retry counter exists
         if "retry_count" not in state:
             state["retry_count"] = 0
@@ -596,7 +603,8 @@ class AgentNodes:
             "content": get_generate_natural_response_prompt(),
         }
 
-        llm = self.llm
+        llm = self.llm_without_reasoning
+        logger.critical(f"llm --> gpt-5-nano, resoning--> minimal")
         last_msg_obj = state["messages"][-1]
         last_msg_content = state["messages"][-1].content
         sql_query = None
@@ -617,7 +625,7 @@ class AgentNodes:
         logger.info(f"SQL query: {sql_query}")
         logger.info(f"Executed SQL Query Result: {last_msg_content}")
         logger.info(f"original user question: {self.user_query}")
-        logger.info(f"Generated final Response: {response.content}")
+        logger.info(f"Generated final Response: {response}")
         logger.critical(f"generate response node completed in {time.time() - start_time:.2f} seconds")
         logger.info("---------------------"*4)
         return {"messages": [response]}

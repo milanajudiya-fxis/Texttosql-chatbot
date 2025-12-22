@@ -24,4 +24,8 @@ def get_toolkit(
     We can cache this if it's stateless, but for now recreating it is cheap
     if the heavy lifting (DB/LLM initialization) is already done.
     """
-    return SQLToolkit(db_manager.get_database(), llm_manager.get_model())
+    return SQLToolkit(
+        db_manager.get_database(), 
+        llm_manager.get_model(),
+        llm_manager.get_model_without_reasoning()
+    )

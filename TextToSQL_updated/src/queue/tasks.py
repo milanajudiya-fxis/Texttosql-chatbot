@@ -125,8 +125,9 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str):
         logger.info("Getting cached LLMManager")
         llm_manager = get_llm_manager()
         llm = llm_manager.get_model()
+        llm_without_reasoning = llm_manager.get_model_without_reasoning()
         
-        toolkit = SQLToolkit(db, llm)
+        toolkit = SQLToolkit(db, llm, llm_without_reasoning)
         
         # Build agent
         agent_builder = AgentGraphBuilder(

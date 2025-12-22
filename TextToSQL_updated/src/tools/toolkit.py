@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 class SQLToolkit:
     """Wrapper for SQL database toolkit"""
 
-    def __init__(self, db: SQLDatabase, llm: ChatOpenAI):
+    def __init__(self, db: SQLDatabase, llm: ChatOpenAI, llm_without_reasoning: ChatOpenAI = None):
         """Initialize SQL toolkit"""
         self.db = db
         self.llm = llm
+        self.llm_without_reasoning = llm_without_reasoning
         self.toolkit = SQLDatabaseToolkit(db=db, llm=llm)
         self.available_tools = self.toolkit.get_tools()
         self._initialize_tools()
