@@ -24,6 +24,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379/0
     restart: unless-stopped
+    volumes:
+      - .:/app
     networks:
       - app-network
 
@@ -78,6 +80,8 @@ services:
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
       - SIMPLE_WORKER=true
+    volumes:
+      - .:/app
     deploy:
       mode: replicated
       replicas: 8

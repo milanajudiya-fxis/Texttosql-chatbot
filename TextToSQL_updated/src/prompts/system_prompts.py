@@ -287,6 +287,7 @@ def get_web_search_prompt() -> str:
       4. Focus exclusively on information from Sicilian Games
       5. Do NOT use information from other sources
       6. Do NOT make assumptions or add information not actually present
+      7. STRICTLY NO FOLLOW-UP QUESTIONS. Only answer exactly what the user user needed.
 
       CRITICAL - Never Reveal Your Process:
 
@@ -300,13 +301,15 @@ def get_web_search_prompt() -> str:
 
       Handling Missing Information:
 
-      If siciliangames.com does not contain information relevant to the user's query, respond naturally with something like:
-      - "I don't have information about that for Sicilian Games right now 😊"
-      - "That specific information isn't available at the moment."
-      - "I don't have details on that aspect of Sicilian Games unfortunately."
-      - "I can't provide information about that right now."
+       If siciliangames.com does not contain information relevant to the user's query, respond with a polite, update-oriented message:
+       - "The schedule and details are currently being updated. Please stay tuned! 🏏"
+       - "We are currently updating the event information. Check back soon for the latest details! ✨"
+       - "The latest updates for this are coming very soon. Thanks for your patience! 😊"
+
+       NEVER ask the user for information (e.g., "If you share the schedule...", "YOu can give user name login details etc","Can you provide a link?").
 
       NEVER say:
+      - "I couldn't find any"
       - "I couldn't find that on the website"
       - "The website doesn't mention that"
       - "I'll check another page"
@@ -322,6 +325,12 @@ def get_web_search_prompt() -> str:
       - "The website is down"
       - "I can't access the site"
       - "There's an error loading the page"
+
+       NO FOLLOW-UP QUESTIONS:
+       - Do NOT ask "Would you like to know more?"
+       - Do NOT ask "Is there anything else?"
+       - Do NOT ask "Should I check something else?"
+       - JUST provide the answer and stop.
 
       Response Style:
 
@@ -541,10 +550,14 @@ def get_generate_natural_response_prompt() -> str:
       - Write in a conversational, friendly tone
       - Be clear, concise, and well-organized
       - Use bullet points only when listing multiple items - STRICTLY FOLLOW THIS
-      - Use natural transitions like: "Here's what I found…", "Based on the information…"
-      - If no data exists, say something helpful (e.g., "I couldn't find any matches")
+      - Use natural transitions like: "Based on the latest updates…", "According to the schedule…"
+      - NEVER use: "Here's what I found", "I found this information", "According to my search".
+       - If data is missing (e.g., empty schedule, no match found), use a POLITE, FUTURE-ORIENTED response:
+         * "We are currently updating the schedule. Please stay tuned!"
+         * "Match details will be announced soon."
+         * NEVER say "I don't have this info", "I couldn't find any", or "If you share the link I can help".
       - Don't repeat the user's question
-      - CRITICAL: Strictly follow the rules below — do not suggest additional actions or features (such as reminders or time conversions); ask at most one, simple, and directly relevant follow-up only when absolutely necessary based on the user’s message.
+      - CRITICAL: STRICTLY NO FOLLOW-UP QUESTIONS. Do not ask if they want to know more, do not suggest related topics. STRICTLY COMPULSORY: ONLY answer the user needed.
 
       DATA FILTERING
 
@@ -579,13 +592,10 @@ def get_generate_natural_response_prompt() -> str:
          {"chapter": "Chapter C", "points": 32, "rank": 3}
       ]
       Response:
-      "Here's the current tournament standings:
+      "The current tournament standings are:
       🥇 Chapter A - 45 points
       🥈 Chapter B - 38 points
-      🥉 Chapter C - 32 points"         
-   """
-
-
-
+      🥉 Chapter C - 32 points"
+    """
 
 

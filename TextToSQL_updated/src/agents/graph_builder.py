@@ -55,7 +55,8 @@ class AgentGraphBuilder:
         builder.add_node("web_search", self.nodes.web_search_node)  # Web search node
         builder.add_node("list_db_tables", self.nodes.list_tables) # List tables node
         builder.add_node("call_get_schema", self.nodes.call_get_schema) # Call get schema node
-        builder.add_node("get_schema", ToolNode([self.toolkit.get_schema_tool_obj()], name="get_schema")) # Get schema tool node for retrieving schema
+        builder.add_node("get_schema", ToolNode([self.toolkit.get_schema_tool_obj()], name="get_schema"))
+        builder.add_node("file_based_llm_node", self.nodes.file_based_llm_node) # Get schema tool node for retrieving schema
         builder.add_node("init_retry_count", self.nodes.init_retry_count)
         builder.add_node("generate_query", self.nodes.generate_query) # Generate query node
         # builder.add_node("get_relevant_schema_and_generate_query", self.nodes.get_relevant_schema_and_generate_query)
@@ -91,7 +92,7 @@ class AgentGraphBuilder:
             {
                 "IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION": "answer_from_previous_conversation",
                 "IN_DOMAIN_DB_QUERY": "list_db_tables",
-                "IN_DOMAIN_WEB_SEARCH": "web_search",
+                "IN_DOMAIN_WEB_SEARCH": "file_based_llm_node",
                 "OUT_OF_DOMAIN": "answer_general"
             }
         )
@@ -99,7 +100,7 @@ class AgentGraphBuilder:
         builder.add_edge("answer_from_previous_conversation", END)
         
         # Web search now ends after searching, no fallback to DB
-        builder.add_edge("web_search", END)
+        builder.add_edge("file_based_llm_node", END)
         
         
         builder.add_edge("list_db_tables", "call_get_schema")

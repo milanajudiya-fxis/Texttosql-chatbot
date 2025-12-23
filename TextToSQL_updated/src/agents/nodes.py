@@ -115,30 +115,174 @@ class AgentNodes:
         logger.info("---------------------"*4)
         return {"messages": [response]}
     
+
+    def scrape_and_cache_site(self):
+        import os, time, requests, pytz
+        from bs4 import BeautifulSoup
+        from datetime import datetime
+
+        BASE_URL = "https://siciliangames.com"
+        PAGES = [
+            "/index.php",
+            "/schedule.php",
+            "/standing.php",
+            "/winners.php",
+            "/contact.html"
+        ]
+        # Use fixed filename for reliable caching (mounted volume path)
+        CACHE_FILE = "/app/src/sicilian_games_cache.html"
+        MAX_AGE = 2 * 60 * 60  # 2 hours
+
+        # ---------- Check existing cache ----------
+        if os.path.exists(CACHE_FILE):
+            file_age = time.time() - os.path.getmtime(CACHE_FILE)
+            if file_age <= MAX_AGE:
+                logger.info(f"Using cached file: {CACHE_FILE} (Age: {file_age:.0f}s)")
+                return CACHE_FILE
+            else:
+                logger.info(f"Cache expired (Age: {file_age:.0f}s). Re-scraping...")
+        else:
+             logger.info("Cache file not found. Scraping...")
+
+        # ---------- Scrape only if missing or expired ----------
+        def clean_html(html):
+            soup = BeautifulSoup(html, "html.parser")
+            # Remove scripts, styles, etc.
+            for tag in soup(["script", "style", "noscript", "iframe", "svg", "header", "footer"]):
+                tag.decompose()
+            
+            # Return body content (preserving tags) or full html
+            if soup.body:
+                # prettify() can optionally be used, but str() is safer for raw content
+                return str(soup.body)
+            return str(soup)
+
+        ist = pytz.timezone("Asia/Kolkata")
+        now_ist = datetime.now(ist)
+
+        sections = []
+        logger.warning("Scraping website...")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        for page in PAGES:
+            try:
+                url = BASE_URL + page
+                # logger.info(f"Fetching {url}...")
+                resp = requests.get(url, headers=headers, timeout=30)
+                resp.raise_for_status()
+                html_content = clean_html(resp.text)
+                sections.append(f"<section id='{page}'><h2>Page: {page}</h2><div>{html_content}</div></section>")
+            except Exception as e:
+                logger.error(f"Failed to scrape {page}: {e}")
+                sections.append(f"<section><h2>{page}</h2><p>CONTENT NOT AVAILABLE</p></section>")
+
+        html = f"""
+        <html>
+        <head><title>Sicilian Games Cached Content</title></head>
+        <body>
+            <h1>Sicilian Games Website Content</h1>
+            <p>Scraped at: {now_ist.strftime('%Y-%m-%d %H:%M:%S %Z')}</p>
+            {''.join(sections)}
+        </body>
+        </html>
+        """
+
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            f.write(html)
+        
+        logger.info(f"Saved cache to {CACHE_FILE}")
+
+        return CACHE_FILE
+
+    def file_based_llm_node(self, state: MessagesState):
+            import time
+
+            start_time = time.time()
+            logger.warning("************** FILE BASED NODE **************")
+
+            user_query = self.user_query
+
+            # 🔒 Will scrape ONLY if cache expired
+            html_file = self.scrape_and_cache_site()
+            
+            messages = state["messages"]
+            previous_conversation = messages[1:-1] if len(messages) > 2 else []
+            clean_previous_history = []
+            if previous_conversation:
+                for msg in previous_conversation:
+                    role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
+                    clean_previous_history.append({
+                        "role": role,
+                        "content": msg.content
+                    })
+
+            with open(html_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            prompt = f"""
+            You are a Sicilian Games assistant.
+
+            Use ONLY the content below to answer.
+            If answer is not present, reply exactly: NOT_FOUND.
+        
+            PREVIOUS CONVERSATION:
+            {clean_previous_history}
+            
+            USER QUESTION:
+            {user_query}
+
+            WEBSITE CONTENT:
+            {content}
+            """
+
+            response = self.llm.invoke(
+                [{"role": "user", "content": prompt}]
+            )
+
+            answer = response.content
+
+            if "NOT_FOUND" in answer:
+                answer = "Sorry, I couldn’t find the relevant information on the Sicilian Games website."
+            logger.warning("Answer: " + answer)
+            logger.critical(f"Node completed in {time.time() - start_time:.2f}s")
+
+            return {
+                "messages": [
+                    AIMessage(
+                        content=answer,
+                        additional_kwargs={
+                            "source": "file_cache",
+                            "file": html_file
+                        }
+                    )
+                ]
+            }
+
+
+    
     # LLM CALL 02_C
     def web_search_node(self, state: MessagesState):
-        """Search using LangChain's web search tool with optional domain filtering."""
+        """
+        Search strictly restricted to specific SicilianGames URLs.
+        Uses Redis for caching scraped content.
+        NO generic web search fallback.
+        """
         start_time = time.time()
-        logger.warning("**************  WEB SEARCH NODE  ************** ")
+        logger.warning("**************  RESTRICTED WEB SEARCH NODE  ************** ")
         logger.warning("LLM call:" + str(self.llm_call))
         self.llm_call += 1
 
         user_query = self.user_query
-        domain = "siciliangames.com"
-
-        # Build search query
-        search_query = f"{user_query} site:{domain}" if domain else user_query
-        logger.info(f"Query: {user_query}")
-        logger.info(f"Domain filter: {domain}")
         
-        # 1. DIRECT URL SCRAPING (Optimization)
-        # Map topics to specific URLs to skip search engine latency/flakiness
+        # 1. DIRECT URL MAPPING
+        # Map topics to specific URLs
         direct_urls = {
             "schedule": "https://siciliangames.com/schedule.php",
-            "fixtures": "https://siciliangames.com/schedule.php",
             "winner": "https://siciliangames.com/winners.php",
             "sponsor": "https://siciliangames.com/index.php",
-            "partners": "https://siciliangames.com/index.php",
             "organizer": "https://siciliangames.com/index.php",
             "standings":"https://siciliangames.com/standing.php",
             "contact": "https://siciliangames.com/contact.html",
@@ -151,22 +295,37 @@ class AgentNodes:
                 target_url = url
                 break
         
-        if target_url:
-            logger.info(f"Targeting specific URL: {target_url}")
-            try:
-                # 1.1 Check Cache for this specific URL
-                redis_client = get_redis_client()
-                cache_key = f"web_scrape:{target_url}"
-                cached_content = None
-                if redis_client:
-                    cached_content = redis_client.get(cache_key)
-                
-                content_text = ""
-                if cached_content:
-                    logger.info("RETRIEVED URL CONTENT FROM CACHE")
-                    content_text = cached_content
-                else:
-                    logger.info("FETCHING URL CONTENT DIRECTLY")
+        if not target_url:
+            logger.warning(f"Query '{user_query}' did not match any allowed topics.")
+            return {
+                "messages": [
+                    AIMessage(
+                        content="I can only provide information about the schedule, winners, sponsors, organizers, standings, and contact details for Sicilian Games. Please ask about one of these topics.",
+                        additional_kwargs={
+                            "source": "restricted_web_search",
+                            "status": "topic_not_allowed",
+                            "query": user_query
+                        }
+                    )
+                ]
+            }
+
+        logger.info(f"Targeting specific URL: {target_url}")
+        
+        try:
+            # 2. CACHE CHECK
+            redis_client = get_redis_client()
+            cache_key = f"web_scrape:{target_url}"
+            content_text = ""
+            
+            if redis_client:
+                content_text = redis_client.get(cache_key)
+            
+            if content_text:
+                logger.info("RETRIEVED URL CONTENT FROM CACHE")
+            else:
+                logger.info("FETCHING URL CONTENT DIRECTLY")
+                try:
                     resp = requests.get(target_url, timeout=30)
                     resp.raise_for_status()
                     soup = BeautifulSoup(resp.content, 'html.parser')
@@ -176,136 +335,89 @@ class AgentNodes:
                         script.decompose()
                     
                     content_text = soup.get_text(separator=' ', strip=True)
-                    # Limit content size to avoid token overflow (approx 1500 words)
-                    content_text = " ".join(content_text.split()[:2500])
-                    logger.warning(f"Content Text: {content_text}")
+                    # Limit content size to avoid token overflow
+                    content_text = " ".join(content_text.split()[:3000])
+                    
                     # Cache the scraped text
                     if redis_client and content_text:
                         redis_client.setex(cache_key, 86400, content_text) # 24h cache
+                        logger.info(f"Cached content for {target_url}")
+                        
+                except Exception as req_err:
+                    logger.error(f"Failed to fetch URL {target_url}: {req_err}")
+                    return {
+                        "messages": [
+                            AIMessage(
+                                content=f"I'm sorry, I'm currently unable to access the {key} page. Please try again later.",
+                                additional_kwargs={
+                                    "source": "restricted_web_search",
+                                    "error": str(req_err),
+                                    "url": target_url
+                                }
+                            )
+                        ]
+                    }
 
-                # 1.2 Generate Answer from Content
-                if content_text:
-                    logger.info("Generate Answer from Scraped Content")
-                    # Use a simplified prompt for summarization
-                    scrape_prompt = f"""
-                    You are a helpful assistant. 
-                    The user asked: "{user_query}"
-                    
-                    Here is the content from {target_url}:
-                    {content_text}
-                    
-                    Answer the user's question using ONLY the provided content. 
-                    If the answer is found, format it nicely. 
-                    If the answer is NOT in the content, say "NOT_FOUND".
-                    """
-                    
-                    llm_response = self.llm.invoke([{"role": "user", "content": scrape_prompt}])
-                    answer = llm_response.content
-                    
-                    if "NOT_FOUND" not in answer:
-                         return {
-                            "messages": [
-                                AIMessage(
-                                    content=answer,
-                                    additional_kwargs={
-                                        "source": "direct_scrape",
-                                        "url": target_url,
-                                        "query": user_query
-                                    }
-                                )
-                            ]
-                        }
-                    else:
-                        logger.warning("Answer not found in scraped content, falling back to search")
-
-            except Exception as e:
-                logger.error(f"Direct scraping failed: {e}")
-                # Fallback to normal search
-
-        # 2. CHECK REDIS CACHE (for generic search)
-        def extract_answer_from_response(response):
-            content = getattr(response, "content", None)
-            if not content or not isinstance(content, list):
-                return ""
-
-            # Extract final "text" block
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    return block.get("text", "")
-
-            return ""
-
-        try:
-            # Prepare LLM with web search tool
-            llm = self.llm
-            tools = [{"type": "web_search_preview"}]
-            llm_with_tools = llm.bind_tools(tools)
-            
-            system_prompt = get_web_search_prompt()
-
-            # Execute LLM call
-            response = llm_with_tools.invoke(
-                [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": search_query}
-                ]
-            )
-            answer = extract_answer_from_response(response)
-            logger.info(f"LLM response: {response}")
-            
-            if not answer or "no_information_found" in answer.lower():
-                logger.warning("No meaningful information found from web search")
-                logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
+            # 3. GENERATE ANSWER
+            if content_text:
+                logger.info("Generating Answer from Content")
+                # Use a simplified prompt for summarization
+                scrape_prompt = f"""
+                You are a helpful assistant for Sicilian Games. 
+                The user asked: "{user_query}"
+                
+                Here is the official information from {target_url}:
+                {content_text}
+                
+                Answer the user's question using ONLY the provided content. 
+                If the specific information is not in the text, say "I couldn't find that specific detail in the official {key} page."
+                """
+                
+                # Using llm_without_reasoning for faster simple Q&A
+                llm_response = self.llm_without_reasoning.invoke([{"role": "user", "content": scrape_prompt}])
+                answer = llm_response.content
+                
+                logger.critical(f"restricted_web_search_node completed in {time.time() - start_time:.2f} seconds")
                 logger.info("---------------------" * 4)
 
                 return {
                     "messages": [
                         AIMessage(
-                            content="Sorry, we couldn’t find any relevant information. Would you like to know more about Sicilian Games? Please ask if you have any relevant questions.",
+                            content=answer,
                             additional_kwargs={
-                                "source": "web_search",
-                                "query": user_query,
-                                "domain": domain
+                                "source": "direct_scrape",
+                                "url": target_url,
+                                "query": user_query
                             }
                         )
                     ]
                 }
-
-            logger.info(f"Web search result: {answer}")
-            logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
-            logger.info("---------------------" * 4)
-
-            return {
-                "messages": [
-                    AIMessage(
-                        content=answer,
-                        additional_kwargs={
-                            "source": "web_search",
-                            "query": user_query,
-                            "domain": domain
-                        }
-                    )
-                ]
-            }
+            else:
+                 # Should not happen if fetch was successful or cache hit
+                 logger.error("Content text is empty after fetch/cache")
+                 return {
+                    "messages": [
+                        AIMessage(
+                            content="I couldn't retrieve the information at this time.",
+                            additional_kwargs={"source": "restricted_web_search", "error": "empty_content"}
+                        )
+                    ]
+                }
 
         except Exception as e:
-            # error handling
-            logger.error(f"Error during web search: {str(e)}")
-            logger.critical(f"web_search_node completed in {time.time() - start_time:.2f} seconds")
-            logger.info("---------------------" * 4)
-
+            logger.error(f"Error during Restricted Web Search: {str(e)}")
             return {
                 "messages": [
                     AIMessage(
-                        content="orry, we couldn’t find any relevant information. Would you like to know more about Sicilian Games? Please ask if you have any relevant questions",
+                        content="An error occurred while verifying the information. Please try again.",
                         additional_kwargs={
-                            "source": "web_search",
+                            "source": "restricted_web_search",
                             "error": str(e),
                             "query": user_query
                         }
                     )
                 ]
-        }
+            }
 
     # LLM CALL 02_A
     def answer_general(self, state: MessagesState):
