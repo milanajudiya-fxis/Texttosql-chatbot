@@ -54,7 +54,7 @@ class AgentGraphBuilder:
         builder.add_node("answer_from_previous_conversation", self.nodes.answer_from_previous_conversation)
         builder.add_node("web_search", self.nodes.web_search_node)  # Web search node
         builder.add_node("list_db_tables", self.nodes.list_tables) # List tables node
-        builder.add_node("call_get_schema", self.nodes.call_get_schema_llm) # Call get schema node
+        builder.add_node("call_get_schema", self.nodes.call_get_schema) # Call get schema node
         builder.add_node("get_schema", ToolNode([self.toolkit.get_schema_tool_obj()], name="get_schema")) # Get schema tool node for retrieving schema
         builder.add_node("init_retry_count", self.nodes.init_retry_count)
         builder.add_node("generate_query", self.nodes.generate_query) # Generate query node

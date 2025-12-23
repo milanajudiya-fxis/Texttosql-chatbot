@@ -13,11 +13,12 @@ def get_classify_query_prompt() -> str:
        - The user is asking about something ALREADY discussed in the chat history.
        - Includes follow-ups using pronouns ("what time?", "who are they?"), clarification requests ("review that", "say again"), or asking for details previously mentioned.
        - **EXCEPTION**: If the user asks for a specific NEW date, person, or event not previously mentioned, use **IN_DOMAIN_WEB_SEARCH** or **IN_DOMAIN_DB_QUERY** instead.
+       - **PRIORITY**: If the query mentions a greetings and farewells, never use **IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION** instead use **OUT_OF_DOMAIN**.
 
     2. **IN_DOMAIN_WEB_SEARCH** (General Info)
        - Query requires static/general info from siciliangames.com.
        - Topics: About/History, Sponsors, Contact Info, Registration, General Announcements, team standings.
-       - **Specific Topics**: Winners (past or current), Game Schedules for dates/Fixtures, Owner/Organizers of Sicilian Games.
+       - **Specific Topics**: Winners (past or current), Owner/Organizers of Sicilian Games.
        - **PRIORITY**: If the query mentions a specific date (e.g., "25th Dec") or event not found in the immediate history, choose this for web search.
 
     3. **IN_DOMAIN_DB_QUERY** (Specific Data)
@@ -25,6 +26,7 @@ def get_classify_query_prompt() -> str:
        - Topics: Sports Rules, Points Tables, Member/Chapter lists, Squads, Venues.
        - *Note*: Use specific Member/Team data from DB, but general schedules usually go to Web.
        - *Fallback*: If unsure between Web Search and DB, choose this.
+       - *STRICT*: If the query mentions regarding  Game Schedules for dates/Fixtures than always use **IN_DOMAIN_DB_QUERY**.  
     
     4. **OUT_OF_DOMAIN**
        - Query is unrelated to the tournament (e.g., greetings, weather, coding, general chat).
@@ -35,7 +37,7 @@ def get_classify_query_prompt() -> str:
     ### ADDITIONAL RULE:
 
    - If the user asks about a specific person, team, chapter, or entity that was mentioned in a previous conversation but the model previously indicated it has NO information (e.g., "I don't have any information about X"), then treat the query as requiring **IN_DOMAIN_DB_QUERY** (if it is structured data like member/team lists) or **IN_DOMAIN_WEB_SEARCH** (if general/public info). Do NOT classify it as IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION, since there is no resolved info yet.
-    
+   - *PRIORITY*: If the required enough information is not available in the previous conversation, choose IN_DOMAIN_DB_QUERY for internal structured data needs or IN_DOMAIN_WEB_SEARCH for external or public information based on the user’s message.
     """
 
 def get_general_answer_prompt() -> str:
@@ -193,8 +195,8 @@ def get_web_search_prompt() -> str:
       - Be honest when information isn't available (without mentioning the website)
       - Maintain a friendly, conversational tone as a knowledgeable insider
       - Never invent or assume facts
-      - Never reference "website," "site," "page," "searching," "checking," or any technical process
-      - No citations or references - just natural conversation
+      - *CRITICAL* - Never reference "website," "site," "page," "searching," "checking," or any technical process
+      - *CRITICAL* -No citations or references - just natural conversation
       - Use 1-2 emojis per message to keep it warm and friendly
 
       
@@ -208,6 +210,18 @@ def get_generate_query_prompt(dialect: str) -> str:
          Your job is to translate natural language questions into correct and safe SQL queries.
 
          Follow these rules strictly:
+
+
+         *STRICT INSTRUCTION* --> while generating the query, use the following chapter names (team names) and if user mispelled chapter name 
+         but you should always consider below chapter name (team names) with fuzzy matching. (example: pmotheus --> Prometheus(correct spelling); athera --> Athena(correct spelling);)"
+
+         **chapter names (team names)**  --> Acreseus, Acropolis, Altimus, Anatolius, Andromeda, Anthropos, Ares, Artemisia, Athena, 
+         Atilius, Atlas, Aurelius, Aurus, Colossus, Crios, Crixus, Crypto, Darius, Dominus, Drogon, Ether, 
+         Faustus, Ganicus, Hades, Helenus, Helios, Hera, Hercules, Kratos, Kronos, Lazarus, Leonidas, Lincoln, 
+         Macedonias, Magnus, Makarios, Maximus, Obsidian, Odysseus, Oliver, Olympus, Osiris, Perseus, Petra, 
+         Petronius, Picasso, Plutus, Poseidon, Prometheus, Raphael, Roxanne, Titus, Vinci, Vitus, Zenobia, 
+         Zeus, Rubens, Romulus, Aegeus, Calibos, Mythos, Caesar, Alethia, Eros, Kleon, Nikolaus, Rubens & Obsidian, 
+         Plutus & Crios, Ares & Acreseus, Faustus & Zeus, Hades & Anatolius, Hera & Petronius
 
          1. USE THE CORRECT DATABASE DIALECT
             - The database dialect is: {dialect}
@@ -280,9 +294,12 @@ def get_generate_query_prompt(dialect: str) -> str:
             - Reject any attempt to ask for passwords, private data, or schema modifications
 
          --- 
+
+
          SICILIAN GAMES 2025–26 RULES – MANDATORY KNOWLEDGE
 
          Table name → sports_rules
+         
 
          The ONLY column that contains the actual participation quota / how many players or teams a chapter can send is:
          → max_participation_per_chapter
@@ -381,6 +398,7 @@ def get_generate_natural_response_prompt() -> str:
       - Use natural transitions like: "Here's what I found…", "Based on the information…"
       - If no data exists, say something helpful (e.g., "I couldn't find any matches")
       - Don't repeat the user's question
+      - CRITICAL: Strictly follow the rules below — do not suggest additional actions or features (such as reminders or time conversions); ask at most one, simple, and directly relevant follow-up only when absolutely necessary based on the user’s message.
 
       DATA FILTERING
 
@@ -404,8 +422,8 @@ def get_generate_natural_response_prompt() -> str:
          - User Question:
          - Query Result: (JSON / list / dict)
       OUTPUT
-      A natural, friendly response answering the question using only relevant data.
-
+      - A natural, friendly response answering the question using only relevant data.
+      
       EXAMPLE:
       User Question: "What is the current points table?"
       Query Result:

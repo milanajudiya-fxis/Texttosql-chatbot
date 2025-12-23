@@ -38,6 +38,30 @@ class QueryResponse(BaseModel):
     error: Optional[str] = None
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Verify external connections on startup"""
+    try:
+        settings = Settings.from_env()
+        logger.info(f"Startup: Connecting to Redis at {settings.redis.host}:{settings.redis.port}")
+        
+        # Test Redis connection with short timeout
+        redis_conn = Redis.from_url(
+        settings.redis.url,
+        socket_timeout=10,
+        socket_connect_timeout=10,
+        retry_on_timeout=True
+    )
+
+        redis_conn.ping()
+        logger.info("Startup: Successfully connected to Redis")
+        
+    except Exception as e:
+        logger.critical(f"Startup: Failed to connect to Redis: {e}")
+        # We don't raise here to allow the app to start, but it's critical info
+
+
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

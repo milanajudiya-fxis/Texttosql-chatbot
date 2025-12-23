@@ -169,7 +169,7 @@ class AgentNodes:
                     content_text = cached_content
                 else:
                     logger.info("FETCHING URL CONTENT DIRECTLY")
-                    resp = requests.get(target_url, timeout=10)
+                    resp = requests.get(target_url, timeout=30)
                     resp.raise_for_status()
                     soup = BeautifulSoup(resp.content, 'html.parser')
                     
@@ -180,7 +180,7 @@ class AgentNodes:
                     content_text = soup.get_text(separator=' ', strip=True)
                     # Limit content size to avoid token overflow (approx 1500 words)
                     content_text = " ".join(content_text.split()[:2500])
-                    
+                    logger.warning(f"Content Text: {content_text}")
                     # Cache the scraped text
                     if redis_client and content_text:
                         redis_client.setex(cache_key, 86400, content_text) # 24h cache
@@ -427,8 +427,27 @@ class AgentNodes:
         logger.critical(f"call_get_schema_llm node completed in {time.time() - start_time:.2f} seconds")
         logger.info("---------------------"*4)
         return {"messages": [response]}
+
+
+    def call_get_schema(self, state: MessagesState):
+        """Get database schema"""
+        start_time = time.time()
+        raw_tables = state["messages"][-1].content
+        tool_input = {
+            "table_names": raw_tables
+        }
+        tool_message = self.toolkit.get_schema_tool_obj().invoke(tool_input)
+        response= AIMessage(content=tool_message)
+        print("############################"*5)
+        logger.info(f"GET Schema Response: {response}")
+        logger.critical(f"call_get_schema node completed in {time.time() - start_time:.2f} seconds")
+        print("############################"*5)
+        return {"messages": [response]}
     
-  
+    
+
+
+
     # LLM CALL 03_D
     def generate_query(self, state: MessagesState):
         """Generate SQL query from natural language"""

@@ -59,10 +59,13 @@ class RedisConfig:
     port: int
     db: int
     password: Optional[str] = None
+    url_override: Optional[str] = None
     
     @property
     def url(self) -> str:
         """Generate Redis URL"""
+        if self.url_override:
+            return self.url_override    
         if self.password:
             return f"redis://:{self.password}@{self.host}:{self.port}/{self.db}"
         return f"redis://{self.host}:{self.port}/{self.db}"
@@ -120,6 +123,7 @@ class Settings:
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
             password=os.getenv("REDIS_PASSWORD", None),
+            url_override=os.getenv("REDIS_URL"),
         )
 
         return cls(
