@@ -203,7 +203,8 @@ async def test_endpoint():
 async def whatsapp_webhook(
     Body: str = Form(...),
     From: str = Form(...),
-    To: str = Form(None)
+    To: str = Form(None),
+    MessageSid: str = Form(...)
 ):
     """
     Twilio WhatsApp webhook endpoint with Redis Queue
@@ -230,7 +231,7 @@ async def whatsapp_webhook(
         # Enqueue the task
         job = q.enqueue(
             'src.queue.tasks.process_whatsapp_message',
-            args=(Body, From, To),
+            args=(Body, From, To, MessageSid),
             job_timeout='5m'
         )
         

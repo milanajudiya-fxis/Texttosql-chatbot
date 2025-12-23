@@ -7,7 +7,7 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import MessagesState
 from src.tools import SQLToolkit
 from src.core.dependencies import get_redis_client
-from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt
+from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt,get_website_qa_prompt
 import time
 from langgraph.graph import END
 import requests
@@ -69,11 +69,32 @@ class AgentNodes:
     # LLM CALL 01 
     def classify_query(self, state: MessagesState):
         """Classify whether query is related to database or general question."""
+        import re
         start_time = time.time()
         logger.warning("************** CLASSIFY QUERY **************")
         logger.warning("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
+        
         messages = state["messages"]
+        # 3. EXTRACT CURRENT QUERY
+        current_query = messages[-1].content
+        self.user_query = current_query
+        logger.warning(f"Current query: {current_query}")
+
+        # --- GREETING BYPASS CHECK ---
+        # Regex to match common greetings (case-insensitive)
+        # Matches: "hi", "hello", "good morning", "whats app", "what's up", "hey", etc.
+        greeting_pattern = r"^\s*(hi|hii+|hey+|heyy+|hello+|helo|good\s*(morning|afternoon|evening|day)|what'?s\s*(up|going\s*on|new)|how\s*(are|r)\s*(you|u)|howdy|yo+|sup|namaste|namaskar|bonjour|ciao|guten\s*tag|konnichiwa|ohayo|shalom)\s*[!.?]*\s*$"
+        
+        if re.match(greeting_pattern, current_query, re.IGNORECASE):
+            logger.info(f"Greeting detected: {current_query}. Bypassing LLM classification.")
+            logger.info("Directly routing to OUT_OF_DOMAIN (General Answer)")
+            logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------"*4)
+            # Create a mock AIMessage with the expected routing content
+            return {"messages": [AIMessage(content="OUT_OF_DOMAIN")]}
+        # -----------------------------
+
+        self.llm_call += 1
         system_message = get_classify_query_prompt()
         previous_conversation = messages[1:-1] if len(messages) > 2 else []
         clean_previous_history = []
@@ -84,10 +105,7 @@ class AgentNodes:
                     "role": role,
                     "content": msg.content
                 })
-        # 3. EXTRACT CURRENT QUERY
-        current_query = messages[-1].content
-        self.user_query = current_query
-        logger.warning(f"Current query: {current_query}")
+        
         llm_payload = {
             "system_message": system_message,
             "previous_conversation": clean_previous_history,
@@ -222,11 +240,10 @@ class AgentNodes:
             with open(html_file, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            prompt = f"""
-            You are a Sicilian Games assistant.
+            system_prompt=get_website_qa_prompt()
 
-            Use ONLY the content below to answer.
-            If answer is not present, reply exactly: NOT_FOUND.
+            prompt = f"""
+            {system_prompt}
         
             PREVIOUS CONVERSATION:
             {clean_previous_history}
@@ -245,7 +262,7 @@ class AgentNodes:
             answer = response.content
 
             if "NOT_FOUND" in answer:
-                answer = "Sorry, I couldn’t find the relevant information on the Sicilian Games website."
+                answer = "I’m unable to find the details right now.Please check back later or contact the Sicilian Games team.."
             logger.warning("Answer: " + answer)
             logger.critical(f"Node completed in {time.time() - start_time:.2f}s")
 
@@ -422,6 +439,7 @@ class AgentNodes:
     # LLM CALL 02_A
     def answer_general(self, state: MessagesState):
         """Answer non-database related user questions normally."""
+        import re
         start_time = time.time()
         logger.warning("************** GENERAL ANSWER **************")
         logger.warning("LLM call:" + str(self.llm_call))
@@ -434,6 +452,23 @@ class AgentNodes:
         if not user_msg:
             logger.error("No human message found in state")
             return {"messages": []}
+
+        # --- GREETING BYPASS & HARDCODED RESPONSE ---
+        greeting_pattern = r"^\s*(hi|hello|hey|good\s*morning|good\s*afternoon|good\s*evening|what'?s\s*up|what'?s\s*app|namaste|hola|bonjour)\s*[!.?]*\s*$"
+        
+        if re.match(greeting_pattern, user_msg.content, re.IGNORECASE):
+            greeting_response = (
+                "👋 Hi! Welcome to Sicilian Games Info Bot\n\n"
+                "I can help you with schedules, sports, standings, venues, partners, or quick updates.\n\n"
+                "What would you like to check?"
+            )
+            logger.info("Greeting detected in answer_general. Returning hardcoded response.")
+            logger.info(f"Greeting Content:\n{greeting_response}")
+            logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------"*4)
+            return {"messages": [AIMessage(content=greeting_response)]}
+        # --------------------------------------------
+
         llm = self.llm_without_reasoning
         messages_for_llm = [
             {"role": "system", "content": 

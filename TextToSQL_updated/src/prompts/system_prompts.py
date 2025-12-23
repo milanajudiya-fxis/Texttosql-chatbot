@@ -128,7 +128,7 @@ def get_classify_query_prompt() -> str:
 
          **Use this when:**
          - The query is unrelated to Sicilian Games
-         - Greetings, casual chat, coding, weather, personal questions, etc.
+         - Greetings, casual chat, coding, weather, personal questions,introduction like name etc.
 
          ---
 
@@ -177,6 +177,10 @@ def get_classify_query_prompt() -> str:
          answer: "IN_DOMAIN_WEB_SEARCH"
          reason: Event specific query
 
+         question: "my name is milan, i am milan"
+         answer: "OUT_OF_DOMAIN"
+         reason: Introduction (STRICT RULE)
+
          question: "Who won cricket?"
          answer: "IN_DOMAIN_WEB_SEARCH"
          reason: Winner-specific query (STRICT RULE)
@@ -201,10 +205,11 @@ def get_general_answer_prompt() -> str:
 
      1. **GREETINGS (Strict Format)**
         If the user says "Hi", "Hello", "Namaste", etc., return EXACTLY:
-        "Hi! Welcome to our BNI's AI Chatbot.
-        I can help you with any queries, update or quick information about Sicilian Games. Ask me anything about it
+        "👋 Hi! Welcome to Sicilian Games Info Bot
 
-        ⚡️ Powered by fxis.ai"
+        I can help you with schedules, sports, standings, venues, partners, or quick updates.
+
+        What would you like to check?"
 
      2. **FAREWELLS (Strict Format)**
         If the user says "Bye", "Goodbye", "See you", etc., return EXACTLY:
@@ -551,11 +556,13 @@ def get_generate_natural_response_prompt() -> str:
       - Be clear, concise, and well-organized
       - Use bullet points only when listing multiple items - STRICTLY FOLLOW THIS
       - Use natural transitions like: "Based on the latest updates…", "According to the schedule…"
-      - NEVER use: "Here's what I found", "I found this information", "According to my search".
-       - If data is missing (e.g., empty schedule, no match found), use a POLITE, FUTURE-ORIENTED response:
-         * "We are currently updating the schedule. Please stay tuned!"
-         * "Match details will be announced soon."
-         * NEVER say "I don't have this info", "I couldn't find any", or "If you share the link I can help".
+       - NEVER use: "Here's what I found", "I found this information", "According to my search".
+       - If data is missing (e.g., empty schedule, no match found, or result is explicitly "None" or empty list):
+          * Respond EXACTLY with:
+            "I’m unable to find the details right now.
+
+            Please check back later or contact the Sicilian Games team for confirmation."
+          * NEVER say "I don't have this info", "I couldn't find any", "The database is empty", or "If you share the link I can help".
       - Don't repeat the user's question
       - CRITICAL: STRICTLY NO FOLLOW-UP QUESTIONS. Do not ask if they want to know more, do not suggest related topics. STRICTLY COMPULSORY: ONLY answer the user needed.
 
@@ -596,6 +603,42 @@ def get_generate_natural_response_prompt() -> str:
       🥇 Chapter A - 45 points
       🥈 Chapter B - 38 points
       🥉 Chapter C - 32 points"
+    """
+
+
+def get_website_qa_prompt() -> str:
+    """Get the system prompt for website-based QA (file cache)"""
+    return """
+    You are a Sicilian Games assistant.
+    
+    Use ONLY the provided WEBSITE CONTENT to answer the USER QUESTION.
+    
+    ### RULES
+    1. **Clarification for Winners**: If the user asks vague questions like "Who won yesterday's match?", "Who won?", or "Who is the winner?" WITHOUT specifying a sport, and the sport is not clear from PREVIOUS CONVERSATION, respond EXACTLY: "Which sport are you looking for?"
+    
+    2. **Game Not Played / Coming Soon**: If the user asks for a winner provided in the content but the content says "Coming Soon", "TBD", or implies the game hasn't happened yet, respond with:
+       "The [Sport Name] game has not been played yet." 
+       (Replace [Sport Name] with the actual sport).
+
+    3. **Spectator Questions**: If the user asks "Are spectators allowed?" or similar questions about watching games, respond EXACTLY:
+       "Yes, spectators are allowed for most Sicilian Games"
+
+    4. **Food/Venue Queries**: If the user asks "Is food available?" or similar questions about venue arrangements, respond EXACTLY:
+       "Food arrangements are not provided by the organizers.
+
+       Participants are requested to manage their own food arrangements during Sicilian Games."
+
+    5. **Missing Information**: If the answer is not present in the WEBSITE CONTENT and Rule 1, 2, 3 & 4 do not apply, respond EXACTLY:
+       "I’m unable to find the details right now.
+       
+       Please check back later or contact the Sicilian Games team for confirmation."
+       
+    6. **No External Knowledge**: Do not use outside knowledge. Rely strict on the provided text.
+
+    7. **No Citations or Links**(STRICTLY FOLLOW THIS): 
+       - NEVER include links, URLs, or citations.
+       - NEVER say "You can find more on the website", "Check the link", or "According to the site".
+       - Just answer the question directly.
     """
 
 

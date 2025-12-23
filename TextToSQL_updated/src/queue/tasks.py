@@ -6,6 +6,8 @@ from src.config import Settings
 from src.core import DatabaseManager, LLMManager, ConversationManager
 from src.tools import SQLToolkit
 from src.agents import AgentGraphBuilder
+import requests
+import base64
 
 
 # Configure logging
@@ -94,13 +96,45 @@ def send_whatsapp_message(to_number: str, message: str):
         )
         return None
 
-def process_whatsapp_message(body: str, from_number: str, to_number: str):
+
+def send_typing_indicator(message_sid: str):
+    """
+    Send Twilio WhatsApp typing indicator.
+    """
+    try:
+        settings = Settings.from_env()
+        url = "https://messaging.twilio.com/v2/Indicators/Typing.json"
+        
+        payload = {
+            "messageId": message_sid,
+            "channel": "whatsapp"
+        }
+        
+        # Basic Auth
+        auth = (settings.twilio.account_sid, settings.twilio.auth_token)
+        
+        resp = requests.post(url, data=payload, auth=auth, timeout=5)
+        
+        if resp.status_code in [200, 201]:
+            logger.info(f"Typing indicator sent for {message_sid}")
+        else:
+            logger.warning(f"Failed to send typing indicator: {resp.text}")
+            
+    except Exception as e:
+        logger.error(f"Error sending typing indicator: {e}")
+
+
+def process_whatsapp_message(body: str, from_number: str, to_number: str, message_sid: str = None):
     """
     Background task to process WhatsApp message and send response.
     """
     start = time.time()
     try:
         logger.info(f"Processing background task for {from_number}: '{body[:100]}...'")
+        
+        # Send typing indicator immediately
+        if message_sid:
+            send_typing_indicator(message_sid)
         
         # Initialize components (using cached dependencies)
         from src.core.dependencies import get_db_manager, get_llm_manager, get_conversation_manager
