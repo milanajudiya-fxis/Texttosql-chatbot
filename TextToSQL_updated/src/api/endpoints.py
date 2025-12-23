@@ -195,7 +195,12 @@ async def whatsapp_webhook(
         settings = Settings.from_env()
         
         # Connect to Redis
-        redis_conn = Redis.from_url(settings.redis.url)
+        redis_conn = Redis.from_url(
+        settings.redis.url,
+            socket_timeout=10,
+            socket_connect_timeout=10,
+            retry_on_timeout=True
+        )
         q = Queue(connection=redis_conn)
         
         # Enqueue the task
