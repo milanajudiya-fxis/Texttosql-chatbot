@@ -85,21 +85,14 @@ def get_redis_client():
             import redis
             logger.info("Initializing global Redis client instance")
             settings = Settings.from_env()
-            if settings.redis.password:
-                _redis_client = redis.Redis(
-                    host=settings.redis.host,
-                    port=settings.redis.port,
-                    db=settings.redis.db,
-                    password=settings.redis.password,
-                    decode_responses=True
-                )
-            else:
-                _redis_client = redis.Redis(
-                    host=settings.redis.host,
-                    port=settings.redis.port,
-                    db=settings.redis.db,
-                    decode_responses=True
-                )
+            # Use from_url to include password/host/port/db handling automatically
+            # and ADD TIMEOUTS to prevent hanging
+            _redis_client = redis.Redis.from_url(
+                settings.redis.url,
+                decode_responses=True,
+                socket_timeout=5,
+                socket_connect_timeout=5
+            )
             # Test connection
             _redis_client.ping()
             logger.info("Redis client initialized and connected")
