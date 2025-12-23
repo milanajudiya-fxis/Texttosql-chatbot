@@ -65,7 +65,13 @@ def main():
         queues = [Queue(name, connection=conn) for name in listen]
         
         # Initialize worker with explicit connection
-        worker = Worker(queues, connection=conn)
+        if os.getenv('SIMPLE_WORKER', 'False').lower() == 'true':
+            from rq import SimpleWorker
+            logger.info("Using SimpleWorker (No forking)")
+            worker = SimpleWorker(queues, connection=conn)
+        else:
+            logger.info("Using Standard Worker (Forking)")
+            worker = Worker(queues, connection=conn)
         worker.work()
             
     except Exception as e:

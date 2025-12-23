@@ -47,6 +47,14 @@ class ConversationManager:
             logger.error(f"Failed to connect to MySQL: {e}", exc_info=True)
             raise
 
+    def _ensure_connection(self):
+        """Ensure database connection is alive"""
+        try:
+            self.conn.ping(reconnect=True)
+        except Exception as e:
+            logger.error(f"Failed to reconnect to MySQL: {e}")
+            self._connect()
+
     def _ensure_table_exists(self) -> None:
         """Create conversation_threads table if it doesn't exist"""
         try:
@@ -77,8 +85,10 @@ class ConversationManager:
         Returns:
             List of message dictionaries with role, content, and timestamp
         """
+        self._ensure_connection()
         if limit is None:
             limit = self.memory_limit
+
 
         try:
             logger.debug(f"Retrieving last {limit} messages for thread_id: {thread_id}")
@@ -111,6 +121,7 @@ class ConversationManager:
             role: Message role (user, assistant, system)
             content: Message content
         """
+        self._ensure_connection()
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
         try:

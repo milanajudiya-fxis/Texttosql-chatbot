@@ -55,12 +55,10 @@ def send_whatsapp_message(to_number: str, message: str):
     try:
         logger.debug(f"Preparing to send WhatsApp message to {to_number}")
         
+        # settings = Settings.from_env()
+        from src.core.dependencies import get_twilio_client, get_conversation_manager
+        client = get_twilio_client()
         settings = Settings.from_env()
-
-        client = Client(
-            settings.twilio.account_sid,
-            settings.twilio.auth_token
-        )
 
         # Check message length and send accordingly
         if len(message) <= 1400:
@@ -104,23 +102,26 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str):
     try:
         logger.info(f"Processing background task for {from_number}: '{body[:100]}...'")
         
-        # Load settings
-        settings = Settings.from_env()
+        # Initialize components (using cached dependencies)
+        from src.core.dependencies import get_db_manager, get_llm_manager, get_conversation_manager
         
         # Initialize conversation manager
-        conversation_manager = ConversationManager(settings)
+        conversation_manager = get_conversation_manager()
         thread_id = from_number
         
         # Save user message
         conversation_manager.save_message(thread_id, "user", body)
         
+        start_init = time.time()
         # Initialize components (using cached dependencies)
         from src.core.dependencies import get_db_manager, get_llm_manager
         
         logger.info("Getting cached DatabaseManager")
+        db_init_start = time.time()
         db_manager = get_db_manager()
         db = db_manager.get_database()
         dialect = db_manager.get_dialect()
+        logger.critical(f"Database init/fetch took {time.time() - db_init_start:.4f}s")
         
         logger.info("Getting cached LLMManager")
         llm_manager = get_llm_manager()
@@ -136,6 +137,7 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str):
             conversation_manager=conversation_manager,
             thread_id=thread_id
         )
+        logger.critical(f"Total Resource Initialization took {time.time() - start_init:.4f}s")
         
         # Execute agent
         messages = []
