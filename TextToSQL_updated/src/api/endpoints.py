@@ -48,10 +48,12 @@ async def startup_event():
         
         # Test Redis connection with short timeout
         redis_conn = Redis.from_url(
-            settings.redis.url,
-            socket_timeout=settings.redis.socket_timeout,
-            socket_connect_timeout=settings.redis.socket_connect_timeout
-        )
+        settings.redis.url,
+        socket_timeout=10,
+        socket_connect_timeout=10,
+        retry_on_timeout=True
+    )
+
         redis_conn.ping()
         logger.info("Startup: Successfully connected to Redis")
         
@@ -218,9 +220,10 @@ async def whatsapp_webhook(
         
         # Connect to Redis
         redis_conn = Redis.from_url(
-            settings.redis.url,
-            socket_timeout=settings.redis.socket_timeout,
-            socket_connect_timeout=settings.redis.socket_connect_timeout
+        settings.redis.url,
+            socket_timeout=10,
+            socket_connect_timeout=10,
+            retry_on_timeout=True
         )
         q = Queue(connection=redis_conn)
         

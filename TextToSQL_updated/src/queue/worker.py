@@ -49,7 +49,14 @@ def main():
         logger.info(f"Connecting to Redis at {settings.redis.host}:{settings.redis.port}")
         
         # Connect to Redis
-        conn = Redis.from_url(redis_url)
+        # conn = Redis.from_url(redis_url)
+        conn = Redis.from_url(
+            redis_url,
+            socket_timeout=10,
+            socket_connect_timeout=10,
+            retry_on_timeout=True
+        )
+
         
         # Listen on default queue
         listen = ['default']
