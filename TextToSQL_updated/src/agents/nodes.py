@@ -137,13 +137,11 @@ class AgentNodes:
             "schedule": "https://siciliangames.com/schedule.php",
             "fixtures": "https://siciliangames.com/schedule.php",
             "winner": "https://siciliangames.com/winners.php",
-            "winner-24-25": "https://siciliangames.com/sicilian-24.php",
             "sponsor": "https://siciliangames.com/index.php",
             "partners": "https://siciliangames.com/index.php",
             "organizer": "https://siciliangames.com/index.php",
             "standings":"https://siciliangames.com/standing.php",
             "contact": "https://siciliangames.com/contact.html",
-            "sicilian 2024-25": "https://siciliangames.com/sicilian-24.php"
         }
 
         # Check if query matches any topic
