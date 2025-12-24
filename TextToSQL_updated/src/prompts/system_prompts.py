@@ -699,7 +699,7 @@ def get_website_qa_prompt() -> str:
 
     9. **WHATSAPP FORMATTING GUIDELINES (STRICT)**
       - **One Fact Per Line**: Do not write long sentences. detailed info must be broken into separate lines.
-      - **Use Bold** for key details: *Team Names*, *Dates*, *Times*, *Scores*, *Venues*.
+      - **Use Bold** for: *Team Names*, *Dates*, *Times*, *Scores*, *Venues*.
       - **Vertical Layout**: Prefer vertical lists over horizontal text.
     """
 
