@@ -7,12 +7,14 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import MessagesState
 from src.tools import SQLToolkit
 from src.core.dependencies import get_redis_client
-from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt,get_website_qa_prompt
+from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt,get_website_qa_prompt, get_relevant_file_names_prompt, get_csv_context_prompt
 import time
 from langgraph.graph import END
 import requests
 from bs4 import BeautifulSoup
 import os
+import pandas as pd
+import glob
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
@@ -277,6 +279,193 @@ class AgentNodes:
                     )
                 ]
             }
+  
+        # LLM CALL 02_A
+    
+    def answer_general(self, state: MessagesState):
+        """Answer non-database related user questions normally."""
+        import re
+        start_time = time.time()
+        logger.warning("************** GENERAL ANSWER **************")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
+        user_msg = next(
+            (msg for msg in reversed(state["messages"]) if msg.type == "human"),
+            None
+        )
+
+        if not user_msg:
+            logger.error("No human message found in state")
+            return {"messages": []}
+
+        # --- GREETING BYPASS & HARDCODED RESPONSE ---
+        greeting_pattern = r"^\s*(hi|hello|hey|good\s*morning|good\s*afternoon|good\s*evening|what'?s\s*up|what'?s\s*app|namaste|hola|bonjour)\s*[!.?]*\s*$"
+        
+        if re.match(greeting_pattern, user_msg.content, re.IGNORECASE):
+            greeting_response = (
+                "👋 Hi! Welcome to Sicilian Games Info Bot\n\n"
+                "I can help you with schedules, sports, standings, venues, partners, or quick updates.\n\n"
+                "What would you like to check?"
+            )
+            logger.info("Greeting detected in answer_general. Returning hardcoded response.")
+            logger.info(f"Greeting Content:\n{greeting_response}")
+            logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------"*4)
+            return {"messages": [AIMessage(content=greeting_response)]}
+        # --------------------------------------------
+
+        llm = self.llm_without_reasoning
+        messages_for_llm = [
+            {"role": "system", "content": 
+             get_general_answer_prompt()},
+            {"role": "user", "content": user_msg.content}
+        ]
+        response = llm.invoke(messages_for_llm)
+        logger.info(f"User current message: {user_msg.content}")
+        logger.info(f"General answer response: {response.content}")
+        logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
+        return {"messages": [response]}
+   
+    # LLM CALL 02_B (SAME SYS PROMPT FOR ALL)
+    def answer_from_previous_conversation(self, state: MessagesState):
+        """Classify whether query is related to database or general question."""
+        start_time = time.time()
+        logger.warning("**************  ANSWER FROM PREVIOUS CONVO ************** ")
+        logger.warning("LLM call:" + str(self.llm_call))
+        self.llm_call += 1
+        messages = state["messages"]
+        system_message = get_answer_from_previous_convo_prompt()
+        previous_conversation = messages[1:-1] if len(messages) > 2 else []
+    
+        clean_previous_history = []
+        if previous_conversation:
+            for msg in previous_conversation:
+                role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
+                clean_previous_history.append({
+                    "role": role,
+                    "content": msg.content
+                })
+        current_query = self.user_query
+        logger.warning(f"Current query: {current_query}")
+        llm_payload = {
+            "system_message": system_message,
+            "previous_conversation": clean_previous_history,
+            "current_query": current_query
+        }
+        messages_for_llm = [
+            {"role": "system", "content": llm_payload["system_message"]},
+            {
+                "role": "system",
+                "content": f"PREVIOUS CONVERSATION:\n{json.dumps(llm_payload['previous_conversation'], indent=2)}"
+            },
+            {
+                "role": "user",
+                "content": llm_payload["current_query"]
+            }
+        ]
+        llm = self.llm
+        response = llm.invoke(messages_for_llm)
+
+        
+        logger.info(f"response content: {response}")
+        logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
+        return {"messages": [response]}
+
+
+    # ---- new Flow ----
+
+    def read_csv_context_node(self, state: MessagesState):
+        """Read all CSVs from Data folder and pass to LLM as context"""
+        import pandas as pd
+        import glob
+        import os
+
+        start_time = time.time()
+        logger.warning("************** READ CSV CONTEXT NODE **************")
+        
+        user_query = self.user_query
+        
+        # Get all CSV files in Data folder
+        data_path = os.path.join(os.getcwd(), "Data")
+        csv_files = glob.glob(os.path.join(data_path, "*.csv"))
+        
+        csv_context = ""
+        for file in csv_files:
+            try:
+                df = pd.read_csv(file)
+                csv_context += f"\nFile: {os.path.basename(file)}\nContent:\n{df.to_string()}\n"
+            except Exception as e:
+                logger.error(f"Error reading {file}: {e}")
+        logger.critical(f"CSV Context: {csv_context}")
+        
+        messages = state["messages"]
+        previous_conversation = messages[1:-1] if len(messages) > 2 else []
+        clean_previous_history = []
+        if previous_conversation:
+            for msg in previous_conversation:
+                role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
+                clean_previous_history.append({
+                    "role": role,
+                    "content": msg.content
+                })
+
+        system_prompt = get_csv_context_prompt(csv_context)
+        
+        prompt = f"""
+        PREVIOUS CONVERSATION:
+        {clean_previous_history}
+        
+        USER QUESTION:
+        {user_query}
+        """
+
+        messages_for_llm = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+
+        llm = self.llm_without_reasoning
+        response = llm.invoke(messages_for_llm)
+        answer = response.content
+        
+        logger.critical(f"CSV Context Response: {answer}")
+        logger.critical(f"read_csv_context_node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
+        
+        return {
+            "messages": [
+                AIMessage(
+                    content=str(answer),
+                    additional_kwargs={
+                        "source": "csv_context",
+                        "files": [os.path.basename(f) for f in csv_files]
+                    }
+                )
+            ]
+        }
+    
+
+
+
+    # ---- new flow ----
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     
@@ -436,97 +625,6 @@ class AgentNodes:
                 ]
             }
 
-    # LLM CALL 02_A
-    def answer_general(self, state: MessagesState):
-        """Answer non-database related user questions normally."""
-        import re
-        start_time = time.time()
-        logger.warning("************** GENERAL ANSWER **************")
-        logger.warning("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
-        user_msg = next(
-            (msg for msg in reversed(state["messages"]) if msg.type == "human"),
-            None
-        )
-
-        if not user_msg:
-            logger.error("No human message found in state")
-            return {"messages": []}
-
-        # --- GREETING BYPASS & HARDCODED RESPONSE ---
-        greeting_pattern = r"^\s*(hi|hello|hey|good\s*morning|good\s*afternoon|good\s*evening|what'?s\s*up|what'?s\s*app|namaste|hola|bonjour)\s*[!.?]*\s*$"
-        
-        if re.match(greeting_pattern, user_msg.content, re.IGNORECASE):
-            greeting_response = (
-                "👋 Hi! Welcome to Sicilian Games Info Bot\n\n"
-                "I can help you with schedules, sports, standings, venues, partners, or quick updates.\n\n"
-                "What would you like to check?"
-            )
-            logger.info("Greeting detected in answer_general. Returning hardcoded response.")
-            logger.info(f"Greeting Content:\n{greeting_response}")
-            logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
-            logger.info("---------------------"*4)
-            return {"messages": [AIMessage(content=greeting_response)]}
-        # --------------------------------------------
-
-        llm = self.llm_without_reasoning
-        messages_for_llm = [
-            {"role": "system", "content": 
-             get_general_answer_prompt()},
-            {"role": "user", "content": user_msg.content}
-        ]
-        response = llm.invoke(messages_for_llm)
-        logger.info(f"User current message: {user_msg.content}")
-        logger.info(f"General answer response: {response.content}")
-        logger.critical(f"answer_general node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*4)
-        return {"messages": [response]}
-    
-    # LLM CALL 02_B (SAME SYS PROMPT FOR ALL)
-    def answer_from_previous_conversation(self, state: MessagesState):
-        """Classify whether query is related to database or general question."""
-        start_time = time.time()
-        logger.warning("**************  ANSWER FROM PREVIOUS CONVO ************** ")
-        logger.warning("LLM call:" + str(self.llm_call))
-        self.llm_call += 1
-        messages = state["messages"]
-        system_message = get_answer_from_previous_convo_prompt()
-        previous_conversation = messages[1:-1] if len(messages) > 2 else []
-    
-        clean_previous_history = []
-        if previous_conversation:
-            for msg in previous_conversation:
-                role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
-                clean_previous_history.append({
-                    "role": role,
-                    "content": msg.content
-                })
-        current_query = self.user_query
-        logger.warning(f"Current query: {current_query}")
-        llm_payload = {
-            "system_message": system_message,
-            "previous_conversation": clean_previous_history,
-            "current_query": current_query
-        }
-        messages_for_llm = [
-            {"role": "system", "content": llm_payload["system_message"]},
-            {
-                "role": "system",
-                "content": f"PREVIOUS CONVERSATION:\n{json.dumps(llm_payload['previous_conversation'], indent=2)}"
-            },
-            {
-                "role": "user",
-                "content": llm_payload["current_query"]
-            }
-        ]
-        llm = self.llm
-        response = llm.invoke(messages_for_llm)
-
-        
-        logger.info(f"response content: {response}")
-        logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
-        logger.info("---------------------"*4)
-        return {"messages": [response]}
 
 
 
@@ -758,9 +856,10 @@ class AgentNodes:
                 }]
             }
 
-    # LLM CALL 05_D
+   
     def generate_response(self, state: MessagesState):
         """Generate final answer to user based on query results"""
+
         start_time = time.time()
         logger.warning("************** Generate Response ************** ")
         logger.warning("LLM call:" + str(self.llm_call))

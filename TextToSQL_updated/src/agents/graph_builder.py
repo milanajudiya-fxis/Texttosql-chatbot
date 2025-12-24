@@ -57,6 +57,7 @@ class AgentGraphBuilder:
         builder.add_node("call_get_schema", self.nodes.call_get_schema) # Call get schema node
         builder.add_node("get_schema", ToolNode([self.toolkit.get_schema_tool_obj()], name="get_schema"))
         builder.add_node("file_based_llm_node", self.nodes.file_based_llm_node) # Get schema tool node for retrieving schema
+        builder.add_node("read_csv_context_node", self.nodes.read_csv_context_node) # Read CSV context node
         builder.add_node("init_retry_count", self.nodes.init_retry_count)
         builder.add_node("generate_query", self.nodes.generate_query) # Generate query node
         # builder.add_node("get_relevant_schema_and_generate_query", self.nodes.get_relevant_schema_and_generate_query)
@@ -91,7 +92,7 @@ class AgentGraphBuilder:
             ),
             {
                 "IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION": "answer_from_previous_conversation",
-                "IN_DOMAIN_DB_QUERY": "list_db_tables",
+                "IN_DOMAIN_DB_QUERY": "read_csv_context_node",
                 "IN_DOMAIN_WEB_SEARCH": "file_based_llm_node",
                 "OUT_OF_DOMAIN": "answer_general"
             }
@@ -101,24 +102,24 @@ class AgentGraphBuilder:
         
         # Web search now ends after searching, no fallback to DB
         builder.add_edge("file_based_llm_node", END)
+        builder.add_edge("read_csv_context_node", END)
         
-        
-        builder.add_edge("list_db_tables", "call_get_schema")
-        builder.add_edge("call_get_schema", "get_schema")
-        builder.add_edge("get_schema", "init_retry_count")
-        builder.add_edge("init_retry_count", "generate_query")
-        builder.add_edge("generate_query", "check_query")
-        builder.add_conditional_edges(
-        "check_query",
-        self.nodes.should_continue,    
-        {
-            "VALID": "run_custom_query",
-            "INVALID": "generate_query",
-            "ERROR": "generate_response",    # More than 2 times Invalid
-        }
-    )
-        builder.add_edge("run_custom_query", "generate_response")
-        builder.add_edge("generate_response", END)
+    #     builder.add_edge("list_db_tables", "call_get_schema")
+    #     builder.add_edge("call_get_schema", "get_schema")
+    #     builder.add_edge("get_schema", "init_retry_count")
+    #     builder.add_edge("init_retry_count", "generate_query")
+    #     builder.add_edge("generate_query", "check_query")
+    #     builder.add_conditional_edges(
+    #     "check_query",
+    #     self.nodes.should_continue,    
+    #     {
+    #         "VALID": "run_custom_query",
+    #         "INVALID": "generate_query",
+    #         "ERROR": "generate_response",    # More than 2 times Invalid
+    #     }
+    # )
+    #     builder.add_edge("run_custom_query", "generate_response")
+        # builder.add_edge("generate_response", END)
         self.agent = builder.compile()
         logger.info("Agent graph built successfully")
 
