@@ -238,7 +238,53 @@ class AgentNodes:
                     })
 
             with open(html_file, "r", encoding="utf-8") as f:
-                content = f.read()
+                full_html = f.read()
+
+            # --- SELECTIVE CONTEXT LOADING ---
+            parse_start = time.time()
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(full_html, "html.parser")
+            logger.info(f"HTML Parsing took: {time.time() - parse_start:.4f}s")
+            
+            # 1. Define Keyword Mapping
+            relevant_sections = []
+            query_lower = user_query.lower()
+            
+            mapping = {
+                "/winners.php": ["won", "winner", "victory", "champion", "result", "gold", "silver"],
+                "/standing.php": ["standing", "point", "rank", "table", "position", "leaderboard"],
+                "/schedule.php": ["schedule", "match", "game", "time", "date", "play", "fixture", "next", "upcoming"],
+                "/contact.html": ["contact", "call", "email", "phone", "address", "reach"],
+                "/index.php": ["sponsor", "partner", "organizer", "about", "history", "sicilian"]
+            }
+
+            # 2. Identify relevant pages
+            target_ids = set()
+            for page_id, keywords in mapping.items():
+                if any(k in query_lower for k in keywords):
+                    target_ids.add(page_id)
+            
+            # 3. Extract key sections
+            # If no keywords matched, default to Schedule + Index (most common)
+            if not target_ids:
+                logger.warning("No keywords matched. Defaulting to Schedule & Index.")
+                target_ids = {"/schedule.php", "/index.php"}
+            else:
+                logger.info(f"Context filtering matched: {target_ids}")
+
+            final_content_parts = []
+            for tid in target_ids:
+                section = soup.find("section", id=tid)
+                if section:
+                    final_content_parts.append(str(section))
+            
+            # Fallback if parsing fails or IDs don't match
+            if not final_content_parts:
+                logger.warning("Context filtering failed to find sections. Using full content.")
+                content = full_html
+            else:
+                content = "\n".join(final_content_parts)
+                logger.critical(f"Reduced context size from {len(full_html)} to {len(content)} chars. Filtering took: {time.time() - parse_start:.4f}s")
 
             system_prompt=get_website_qa_prompt()
 
@@ -251,13 +297,15 @@ class AgentNodes:
             USER QUESTION:
             {user_query}
 
-            WEBSITE CONTENT:
+            WEBSITE CONTENT (Filtered for Relevance):
             {content}
             """
-
+            
+            llm_start = time.time()
             response = self.llm.invoke(
                 [{"role": "user", "content": prompt}]
             )
+            logger.critical(f"LLM Invocation took: {time.time() - llm_start:.4f}s")
 
             answer = response.content
 
