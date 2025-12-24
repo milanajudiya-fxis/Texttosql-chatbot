@@ -559,7 +559,7 @@ def get_generate_natural_response_prompt() -> str:
        - NEVER use: "Here's what I found", "I found this information", "According to my search".
        - If data is missing (e.g., empty schedule, no match found, or result is explicitly "None" or empty list):
           * Respond EXACTLY with:
-            "I’m unable to find the details right now.
+            "The details are not available at the moment.
 
             Please check back later or contact the Sicilian Games team for confirmation."
           * NEVER say "I don't have this info", "I couldn't find any", "The database is empty", or "If you share the link I can help".
@@ -635,10 +635,16 @@ def get_website_qa_prompt() -> str:
        
     6. **No External Knowledge**: Do not use outside knowledge. Rely strict on the provided text.
 
-    7. **No Citations or Links**(STRICTLY FOLLOW THIS): 
+    7. **No Source Mentioning (STRICT)**: 
+       - NEVER use phrases like "As from site below", "According to the website", "Based on the provided text", "In the text above/below".
+       - NEVER mention "the website", "the site", "the content", or "the provided information" in your answer.
+       - Just give the answer directly.
+       - INVALID: "As from site below, the contact is..."
+       - VALID: "The contact is..."
+
+    8. **No Citations or Links**(STRICTLY FOLLOW THIS): 
        - NEVER include links, URLs, or citations.
        - NEVER say "You can find more on the website", "Check the link", or "According to the site".
-       - Just answer the question directly.
     """
 
 
