@@ -76,6 +76,14 @@ def get_classify_query_prompt() -> str:
          - The user asks about a new date, new person, new team, or new event not already resolved
          - The query includes greetings or farewells → use OUT_OF_DOMAIN
 
+         **DO NOT USE if:**
+         - The user asks about a new date, new person, new team, or new event not already resolved
+         - The query includes greetings or farewells → use OUT_OF_DOMAIN
+
+         **EXCEPTION FOR IDENTITY QUERIES:**
+         - If the user asks "Which team am I in?", "What is my name?" or similar personal questions AND you don't know the answer from history:
+         - Classify as **IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION** so the assistant can ask for details.
+
          ---
 
          ### 2. IN_DOMAIN_WEB_SEARCH (General / Public Info)
@@ -269,8 +277,12 @@ def get_answer_from_previous_convo_prompt() -> str:
       Previous: "Who won the basketball final?" → Current: "What was his final score?" → You identify the player from previous context
 
       ### STRICT NEGATIVE CONSTRAINTS (MANDATORY)
-      1. **NEVER ASK FOR PERSONAL INFO**: Do NOT ask for registration ID, player ID, email, or phone number to "check" something.
-      2. **NEVER REDIRECT TO WEBSITE**: Do NOT say "check the website" or "visit siciliangames.com". Provide the info directly or say you don't have it.
+      1. **NEVER ASK FOR SENSITIVE PERSONAL INFO**: Do NOT ask for Registration ID, Player ID, email, phone number, or address.
+      2. **ALLOWED EXCEPTION**: You MAY ask for **Name** and **Team Name** ONLY IF:
+         - The user explicitly asks "Which team am I in?", "What is my name?", "Where is my match?"
+         - AND you do not have this information in the conversation history.
+         - In this case, politely ask: "Could you please tell me your Name and Team so I can check for you?"
+      3. **NEVER REDIRECT TO WEBSITE**: Do NOT say "check the website" or "visit siciliangames.com". Provide the info directly or say you don't have it.
 
       RESPONSE GUIDELINES:
 
@@ -525,6 +537,95 @@ def get_generate_query_prompt(dialect: str) -> str:
          - You may be provided with previous conversation context as reference
          - Always prioritize the current user query over previous context
          - Use previous conversations only to understand context, not to reuse old queries blindly
+
+         FEW-SHOT EXAMPLE — UPCOMING MATCH (PLAYER-BASED)
+
+         ### User Question Examples
+
+         - When is my next match?
+         - When will I play next?
+         - Show my upcoming game
+         - my name is prince when will be my next match?
+
+         ### SQL
+
+               SELECT
+                  s.id AS schedule_id,
+                  g.sport_name AS game_name,
+
+                  CASE
+                     WHEN s.team1_id = tm.team THEN
+                           CONCAT(s.team1_name, s.team1_group)
+                     ELSE
+                           CONCAT(s.team2_name, s.team2_group)
+                  END AS your_team_name,
+
+                  CASE
+                     WHEN s.team1_id = tm.team THEN
+                           CONCAT(s.team2_name, s.team2_group)
+                     ELSE
+                           CONCAT(s.team1_name, s.team1_group)
+                  END AS opponent_team_name,
+
+                  s.date,
+                  s.day,
+                  s.start_time,
+                  s.end_time,
+                  s.stage
+               FROM tbl_members m
+               JOIN tbl_team_members tm
+                  ON tm.member = m.id
+               JOIN schedules s
+                  ON s.team1_id = tm.team
+                  OR s.team2_id = tm.team
+               JOIN tbl_games g
+                  ON g.g_id = s.game_id
+               WHERE LOWER(m.name) = 'player_name'
+               AND (
+                     s.date > CURDATE()
+                     OR (s.date = CURDATE() AND s.start_time > CURTIME())
+                     )
+               ORDER BY s.date, s.start_time
+               LIMIT 1;
+
+         UPCOMING MATCH (TEAM-BASED / CHAPTER-BASED)
+
+              ### User Question Examples
+
+               - When is my next match of athena team?
+               - When will I play next football match my team is anthropos?
+               - Show my upcoming game my chapter is anthropos
+               - my name is prince when will be my next match?
+
+         ### SQL
+
+       SELECT
+               s.id AS schedule_id,
+               g.sport_name AS game_name,
+
+               CONCAT(s.team1_name, ' ', s.team1_group) AS team_1,
+               CONCAT(s.team2_name, ' ', s.team2_group) AS team_2,
+
+               s.date,
+               s.day,
+               s.start_time,
+               s.end_time,
+               s.stage
+            FROM schedules s
+
+            JOIN tbl_games g
+               ON g.g_id = s.game_id
+
+            WHERE (
+                  LOWER(s.team1_name) = LOWER('team_name')
+                  OR LOWER(s.team2_name) = LOWER('team_name')
+                  )
+            AND (
+                  s.date > CURDATE()
+                  OR (s.date = CURDATE() AND s.start_time > CURTIME())
+                  )
+
+            ORDER BY s.date, s.start_time;
     """
 
 # CLASSIFIER VALID / INVALID
@@ -574,6 +675,7 @@ def get_generate_natural_response_prompt() -> str:
        - Be clear, concise, and well-organized
        - Use **Bold** for emphasis (e.g., *Team Name*, *Date*, *Winner*).
        - Use bullet points only when listing multiple items - STRICTLY FOLLOW THIS
+       - Never use GAME_ID, TEAM_ID, etc. in the response.
        - Use natural transitions like: "Based on the latest updates…", "According to the schedule…"
         - NEVER use: "Here's what I found", "I found this information", "According to my search".
         - If data is missing (e.g., empty schedule, no match found, or result is explicitly "None" or empty list):
@@ -596,18 +698,26 @@ def get_generate_natural_response_prompt() -> str:
 
        WHATSAPP FORMATTING GUIDELINES (STRICT)
        - **One Fact Per Line**: Do not write long sentences. detailed info must be broken into separate lines.
-       - **Use Bold** for key details: *Team Names*, *Dates*, *Times*, *Scores*, *Venues*.
+       - **Clean Text**: Do NOT use bold (*text*) for values like time, date, or team names. Keep it plain.
        - **Vertical Layout**: Prefer vertical lists over horizontal text.
 
        BAD FORMATTING (DO NOT DO THIS):
        "Your next match is on **26 December 2025** between **Hercules** and **Eros** in the **League** at **10:00 PM**."
 
+       Also BAD (Avoid Asterisks):
+       📅 Date: *26 December 2025*
+       ⏰ Time: *10:00 PM*
+
        GOOD FORMATTING (DO THIS):
        "Your next match is scheduled! 🏏
 
-       📅 Date: *26 December 2025*
-       ⚔️ Teams: *Hercules* vs *Eros*
-       ⏰ Time: *10:00 PM* use this 12 hour formating in time"
+       📅 Date: 26 December 2025
+       ⚔️ Teams: Hercules vs Eros
+       ⏰ Time: 10:00 PM (12-hour format)"
+
+      BAD FORMATTING (DO NOT DO THIS):
+      "**Date**: 26 December 2025"  <- NO double asterisks
+      "Date: *26 December 2025*"    <- NO asterisks on values (User dislikes them)
 
        DATA FILTERING
        - Include only what the user asked for
@@ -624,6 +734,7 @@ def get_generate_natural_response_prompt() -> str:
       - Use compact phrasing
       - Use 1–2 emojis max
       - Sound helpful and professional, not robotic
+
 
       INPUT FORMAT
          - User Question:
@@ -642,9 +753,9 @@ def get_generate_natural_response_prompt() -> str:
       Response:
       "The current tournament standings are:
       
-      🥇 *Chapter A* - 45 points
-      🥈 *Chapter B* - 38 points
-      🥉 *Chapter C* - 32 points"
+      🥇 Chapter A - 45 points
+      🥈 Chapter B - 38 points
+      🥉 Chapter C - 32 points"
     """
 
 
@@ -697,10 +808,35 @@ def get_website_qa_prompt() -> str:
       3. **NO UNSOLICITED ADVICE**: 
          - Do not provide extra tips like "You can also check X" or "Make sure to bring Y".
 
-    9. **WHATSAPP FORMATTING GUIDELINES (STRICT)**
-      - **One Fact Per Line**: Do not write long sentences. detailed info must be broken into separate lines.
-      - **Use Bold** for: *Team Names*, *Dates*, *Times*, *Scores*, *Venues*.
+      WHATSAPP FORMATTING GUIDELINES (STRICT)
+      - **Use Emojis**: Always use emojis for keys (e.g., 📅 Date, ⏰ Time).
+      - **PLAIN TEXT ONLY**: Do NOT use asterisks (*) or bold markup. User dislikes them.
+      - **One Fact Per Line**: detailed info must be broken into separate lines.
       - **Vertical Layout**: Prefer vertical lists over horizontal text.
+
+      BAD FORMATTING (DO NOT DO THIS):
+      "**Date**: 26 December 2025"   <- INVALID
+      "*Date*: 26 December 2025"     <- INVALID (No asterisks allowed)
+      "Date: *26 December 2025*"     <- INVALID
+
+      GOOD FORMATTING (STRICTLY FOLLOW THIS):
+      # Example 1
+       "Your next match is scheduled! 🏏
+
+       📅 Date: 26 December 2025
+       ⚔️ Teams: Hercules vs Eros
+       ⏰ Time: 10:00 PM"
+
+      # Example 2
+      "The current tournament standings are:
+      
+      🥇 Chapter A - 45 points
+      🥈 Chapter B - 38 points
+      🥉 Chapter C - 32 points"
+
+      # Example 3
+      "Snooker winners - Females
+
+      🥇 Kavita Ashodia - BNI Maximus
+      🥈 Bhavana Kataria - BNI Oliver"
     """
-
-

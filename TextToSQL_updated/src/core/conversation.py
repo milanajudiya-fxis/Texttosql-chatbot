@@ -23,7 +23,7 @@ class ConversationManager:
         self.settings = settings
         self.conn = None
         self.table_name = "conversation_threads"
-        self.memory_limit = 2  # Number of messages to keep in context
+        self.memory_limit = 15  # Number of messages to keep in context
         self._connect()
         self._ensure_table_exists()
         logger.info("ConversationManager initialized successfully")
@@ -105,6 +105,7 @@ class ConversationManager:
 
                 history = json.loads(row['conversation'])
                 messages = history[-limit:] if len(history) > limit else history
+                logger.warning(f"Retrieved {messages}")
                 logger.info(f"Retrieved {len(messages)} messages from {len(history)} total for thread_id: {thread_id}")
                 logger.debug(f"Message roles: {[m.get('role') for m in messages]}")
                 return messages
