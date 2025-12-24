@@ -23,7 +23,7 @@ class ConversationManager:
         self.settings = settings
         self.conn = None
         self.table_name = "conversation_threads"
-        self.memory_limit = 15  # Number of messages to keep in context
+        self.memory_limit = 2  # Number of messages to keep in context
         self._connect()
         self._ensure_table_exists()
         logger.info("ConversationManager initialized successfully")

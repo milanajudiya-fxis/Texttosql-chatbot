@@ -83,7 +83,7 @@ class AgentNodes:
         # --- GREETING BYPASS CHECK ---
         # Regex to match common greetings (case-insensitive)
         # Matches: "hi", "hello", "good morning", "whats app", "what's up", "hey", etc.
-        greeting_pattern = r"^\s*(hi|hii+|hey+|heyy+|hello+|helo|good\s*(morning|afternoon|evening|day)|what'?s\s*(up|going\s*on|new)|how\s*(are|r)\s*(you|u)|howdy|yo+|sup|namaste|namaskar|bonjour|ciao|guten\s*tag|konnichiwa|ohayo|shalom)\s*[!.?]*\s*$"
+        greeting_pattern = r"^\s*(hi|hu|ho|hii+|hey+|heyy+|hello+|helo|good\s*(morning|afternoon|evening|day)|what'?s\s*(up|going\s*on|new)|how\s*(are|r)\s*(you|u)|howdy|yo+|sup|namaste|namaskar|bonjour|ciao|guten\s*tag|konnichiwa|ohayo|shalom)\s*[!.?]*\s*$"
         
         if re.match(greeting_pattern, current_query, re.IGNORECASE):
             logger.info(f"Greeting detected: {current_query}. Bypassing LLM classification.")

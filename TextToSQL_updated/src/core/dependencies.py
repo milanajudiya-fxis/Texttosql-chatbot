@@ -36,12 +36,6 @@ def get_llm_manager() -> LLMManager:
         _llm_manager = LLMManager(settings)
     return _llm_manager
 
-    _db_manager = None
-    _llm_manager = None
-    _conversation_manager = None
-    _twilio_client = None
-    logger.info("Global dependencies reset")
-
 _redis_client = None
 _conversation_manager = None
 _twilio_client = None

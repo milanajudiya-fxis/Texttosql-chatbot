@@ -10,6 +10,7 @@ from rq import Worker, Queue
 from dotenv import load_dotenv
 from colorlog import ColoredFormatter
 from src.config import Settings
+from src.core.dependencies import get_db_manager, get_llm_manager, get_conversation_manager
 
 # Load environment variables
 load_dotenv()
@@ -55,6 +56,12 @@ def main():
             socket_connect_timeout=10,
             retry_on_timeout=True
         )
+
+        logger.info("Pre-initializing global dependencies...")
+        get_db_manager()
+        get_llm_manager()
+        get_conversation_manager()
+        logger.info("Dependencies initialized.")
         
         # Listen on default queue
         listen = ['default']
