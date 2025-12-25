@@ -7,7 +7,7 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import MessagesState
 from src.tools import SQLToolkit
 from src.core.dependencies import get_redis_client
-from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_web_search_prompt,get_website_qa_prompt
+from src.prompts.system_prompts import get_generate_query_prompt, get_check_query_prompt, get_classify_query_prompt, get_general_answer_prompt, get_generate_natural_response_prompt, get_answer_from_previous_convo_prompt, get_website_qa_prompt, get_classify_query_updated_prompt
 import time
 from langgraph.graph import END
 import requests
@@ -40,6 +40,7 @@ class AgentNodes:
         self.max_check_attempts = max_check_attempts
         self.llm_call = 1
         self.user_query = ""
+        self.clean_previous_history = None
 
     def fetch_conversation_history(self, state: MessagesState):
         """Fetch last 15 conversation messages and prepend them before the current query."""
@@ -60,6 +61,28 @@ class AgentNodes:
                         new_messages.append(HumanMessage(content=msg["content"]))
                     elif msg["role"] == "assistant":
                         new_messages.append(AIMessage(content=msg["content"]))
+        # SAVE USER MESSAGE TO DB IF NOT EXISTS
+        if self.conversation_manager and self.thread_id:
+            last_saved_content = history[-1]['content'] if history else None
+            # Only save if the content is different (avoid duplicates on re-runs)
+            if current_message.content != last_saved_content:
+                logger.info("Saving new USER message to DB...")
+                self.conversation_manager.save_message(
+                    self.thread_id, 
+                    "user", 
+                    current_message.content
+                )
+                # Re-fetch or append to local new_messages to ensure consistency
+                new_messages.append(current_message)
+            else:
+                 # Even if saved, ensure it's in the state list if not already
+                 if not new_messages or new_messages[-1].content != current_message.content:
+                     new_messages.append(current_message)
+        else:
+             # Fallback for no manager
+             if not new_messages or new_messages[-1].content != current_message.content:
+                 new_messages.append(current_message)
+        
         state["messages"] = new_messages
         logger.info(f"CURRENT USER QUERY: {current_message}")
         logger.critical(f"fetch conversation node completed in {time.time() - start_time:.2f} seconds")
@@ -97,18 +120,18 @@ class AgentNodes:
         self.llm_call += 1
         system_message = get_classify_query_prompt()
         previous_conversation = messages[1:-1] if len(messages) > 2 else []
-        clean_previous_history = []
+        self.clean_previous_history = []
         if previous_conversation:
             for msg in previous_conversation:
                 role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
-                clean_previous_history.append({
+                self.clean_previous_history.append({
                     "role": role,
                     "content": msg.content
                 })
         
         llm_payload = {
             "system_message": system_message,
-            "previous_conversation": clean_previous_history,
+            "previous_conversation": self.clean_previous_history,
             "current_query": current_query
         }
 
@@ -133,6 +156,77 @@ class AgentNodes:
         logger.info("---------------------"*4)
         return {"messages": [response]}
     
+
+    def classify_query_updated(self, state: MessagesState):
+        """Classify whether query is related to database or general question."""
+        import re
+        start_time = time.time()
+        logger.warning("************** CLASSIFY QUERY **************")
+        logger.warning("LLM call:" + str(self.llm_call))
+        
+        messages = state["messages"]
+        # 3. EXTRACT CURRENT QUERY
+        current_query = messages[-1].content
+        self.user_query = current_query
+        logger.warning(f"Current query: {current_query}")
+
+        # --- GREETING BYPASS CHECK ---
+        # Regex to match common greetings (case-insensitive)
+        # Matches: "hi", "hello", "good morning", "whats app", "what's up", "hey", etc.
+        greeting_pattern = r"^\s*(hi|hu|ho|hii+|hey+|heyy+|hello+|helo|good\s*(morning|afternoon|evening|day)|what'?s\s*(up|going\s*on|new)|how\s*(are|r)\s*(you|u)|howdy|yo+|sup|namaste|namaskar|bonjour|ciao|guten\s*tag|konnichiwa|ohayo|shalom)\s*[!.?]*\s*$"
+        
+        if re.match(greeting_pattern, current_query, re.IGNORECASE):
+            logger.info(f"Greeting detected: {current_query}. Bypassing LLM classification.")
+            logger.info("Directly routing to OUT_OF_DOMAIN (General Answer)")
+            logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+            logger.info("---------------------"*4)
+            # Create a mock AIMessage with the expected routing content
+            return {"messages": [AIMessage(content="OUT_OF_DOMAIN")]}
+        # -----------------------------
+
+        self.llm_call += 1
+        previous_conversation = messages[1:-1] if len(messages) > 2 else []
+        clean_previous_history = []
+        if previous_conversation:
+            for msg in previous_conversation:
+                role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
+                clean_previous_history.append({
+                    "role": role,
+                    "content": msg.content
+                })
+
+        system_message = get_classify_query_updated_prompt( 
+            previous_conversation=clean_previous_history,
+            current_query=current_query
+        )
+        
+        # llm_payload = {
+        #     "system_message": system_message,
+        #     "previous_conversation": clean_previous_history,
+        #     "current_query": current_query
+        # }
+
+        messages_for_llm = [
+            {
+                "role": "system",
+                "content": system_message
+            }
+        ]
+
+        llm = self.llm
+        logger.critical(f"llm --> gpt-4.1-mini")
+        response = llm.invoke(messages_for_llm)
+        decision = response.content.strip().upper()
+        logger.info(f"Classification result: {decision}")
+        logger.info(f"response content: {response}")
+        logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
+        return {"messages": [response]}
+
+
+
+
+
 
     def scrape_and_cache_site(self):
         import os, time, requests, pytz
@@ -577,9 +671,6 @@ class AgentNodes:
         return {"messages": [response]}
 
 
-
-
-
     def list_tables(self, state: MessagesState):
         """List available tables and load conversation history if available"""
         messages = []
@@ -630,12 +721,55 @@ class AgentNodes:
             "table_names": raw_tables
         }
         tool_message = self.toolkit.get_schema_tool_obj().invoke(tool_input)
+        logger.critical(f"Tool Message: {tool_message}")
         response= AIMessage(content=tool_message)
-        print("############################"*5)
+        logger.warning("**************   TABLE  SCHEMA FETCH ( MANUAL TOOL CALL) ************** ")
         logger.info(f"GET Schema Response: {response}")
         logger.critical(f"call_get_schema node completed in {time.time() - start_time:.2f} seconds")
-        print("############################"*5)
+        logger.info("---------------------"*4)
         return {"messages": [response]}
+
+    def call_get_schema_file(self, state: MessagesState):
+        """Get database schema from file if exists, else call tool and cache it"""
+        start_time = time.time()
+
+        raw_tables = state["messages"][-1].content
+        logger.info(f"Requested tables: {raw_tables}")
+
+        schema_file_path = "/app/src/schema.txt"
+        schema_content = None
+        if os.path.exists(schema_file_path):
+            logger.critical("Schema file found. Reading from file.")
+            with open(schema_file_path, "r", encoding="utf-8") as f:
+                schema_content = f.read()
+        else:
+            logger.critical("Schema file not found. Calling schema tool.")
+            tool_input = {
+                "table_names": raw_tables
+            }
+
+            tool_message = self.toolkit.get_schema_tool_obj().invoke(tool_input)
+            logger.critical(f"Tool Message: {tool_message}")
+            schema_content = tool_message
+            try:
+                with open(schema_file_path, "w", encoding="utf-8") as f:
+                    f.write(str(schema_content))
+                logger.critical("Schema saved to schema.txt")
+            except Exception as e:
+                logger.exception("Failed to write schema to file")
+
+        response = AIMessage(
+            content=schema_content
+        )
+        logger.warning("**************   TABLE SCHEMA FETCH (FILE CACHE) **************")
+        logger.info(f"GET Schema Response: {response}")
+        logger.critical(
+            f"call_get_schema node completed in {time.time() - start_time:.2f} seconds"
+        )
+        logger.info("---------------------" * 4)
+
+        return {"messages": [response]}
+    
     
     
 
@@ -648,16 +782,18 @@ class AgentNodes:
         logger.warning("**************  GENERATE SQL QUERY ************** ")
         logger.warning("LLM call:" + str(self.llm_call))
         self.llm_call += 1
+        
         system_message = {
             "role": "system",
-            "content": get_generate_query_prompt(self.db_dialect) + "\n\nReturn ONLY a SQL query. No explanations.",
+            "content": get_generate_query_prompt(self.db_dialect) + "\n\nPREVIOUS CONVERSATION HISTORY:\n" + json.dumps(self.clean_previous_history, indent=2) + "\n\nUSER QUERY:\n" + self.user_query + "\n\nReturn ONLY a SQL query. No explanations.",
         }
 
         llm = self.llm_without_reasoning
+
         logger.critical(f"llm --> gpt-4.1-mini")
         response = llm.invoke([system_message] + state["messages"])
         logger.info(f"Dialect: {self.db_dialect}")
-        logger.info(f"SCHEMA FOR GENERATING SQL--->{state['messages'][-1].content}")
+        # logger.info(f"SCHEMA FOR GENERATING SQL--->{state['messages'][-1].content}")
         logger.info(f"Generated Query Response: {response}")
         logger.critical(f"generate_query node completed in {time.time() - start_time:.2f} seconds")
         logger.info("---------------------"*4)
@@ -725,8 +861,6 @@ class AgentNodes:
         last_msg = state["messages"][-1]
         verdict = last_msg.content.strip().upper()
         logger.warning("**************  SHOULD CONTINUE ************** ")
-
-        logger.warning(f"state: {state}")
         # Ensure retry counter exists
         if "retry_count" not in state:
             state["retry_count"] = 0
@@ -837,6 +971,16 @@ class AgentNodes:
 
 
         response = llm.invoke(llm_messages)
+        
+        # SAVE ASSISTANT RESPONSE TO DB
+        if self.conversation_manager and self.thread_id:
+            logger.info("Saving ASSISTANT response to DB...")
+            self.conversation_manager.save_message(
+                self.thread_id,
+                "assistant",
+                response.content
+            )
+
         logger.info(f"SQL query: {sql_query}")
         logger.info(f"Executed SQL Query Result: {last_msg_content}")
         logger.info(f"original user question: {self.user_query}")

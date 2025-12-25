@@ -8,6 +8,7 @@ from src.tools import SQLToolkit
 from src.agents import AgentGraphBuilder
 import requests
 import base64
+import re
 
 
 # Configure logging
@@ -188,7 +189,15 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str, messag
         
         # Get response
         final_message = messages[-1] if messages else None
-        result = final_message.content if final_message else "Sorry, I couldn't process your question."
+
+        if final_message and hasattr(final_message, "content"):
+            # Convert **Text** → *Text*
+            result = re.sub(r"\*\*(.*?)\*\*", r"*\1*", final_message.content)
+        else:
+            result = "Sorry, I couldn't process your question."
+        
+         
+        # result = final_message.content if final_message else "Sorry, I couldn't process your question."
         
         # Save assistant response
         conversation_manager.save_message(thread_id, "assistant", result)
@@ -209,7 +218,7 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str, messag
         # Try to send error message
         try:
             user_number = from_number.replace("whatsapp:", "")
-            send_whatsapp_message(user_number, "Sorry, I encountered an error processing your request.")
+            send_whatsapp_message(user_number, "The details are not available at the moment. Please check back later or contact the Sicilian Games team for confirmation.")
         except:
             pass
             

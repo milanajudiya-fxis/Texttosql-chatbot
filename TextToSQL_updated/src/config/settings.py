@@ -42,6 +42,8 @@ class LLMWithoutReasoningConfig:
     timeout: Optional[float]
     max_retries: int
     api_key: str
+    reasoning_effort: str = None 
+    max_reasoning_tokens: int = None
 
 
 @dataclass
@@ -109,6 +111,8 @@ class Settings:
             max_tokens=None,
             timeout=None,
             max_retries=int(os.getenv("LLM_WITHOUT_REASONING_MAX_RETRIES", "2")),
+            reasoning_effort=os.getenv("LLM_WITHOUT_REASONING_REASONING_EFFORT", "minimal"),
+            max_reasoning_tokens=int(os.getenv("LLM_WITHOUT_REASONING_MAX_REASONING_TOKENS", "0")),
             api_key=os.getenv("OPENAI_API_KEY", ""),
             )
             

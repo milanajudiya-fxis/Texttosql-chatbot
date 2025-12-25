@@ -1,0 +1,276 @@
+**Table Relations:**
+
+Parent Table,PK,Child Table,FK
+tbl_chapters,c_id,tbl_game_chapter_group_mapping,c_id
+tbl_games,g_id,tbl_game_chapter_group_mapping,g_id
+tbl_games,g_id,tbl_teams,sport
+tbl_chapters,c_id,tbl_teams,chapter
+tbl_teams,team_id,tbl_team_members,team
+tbl_members,id,tbl_team_members,member
+tbl_games,g_id,schedules,game_id
+tbl_teams,team_id,schedules,team1_id
+tbl_teams,team_id,schedules,team2_id
+
+
+
+CREATE TABLE conversation_threads (
+    thread_id VARCHAR(255) NOT NULL, 
+    conversation JSON NOT NULL, 
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, 
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
+    PRIMARY KEY (thread_id)
+)ENGINE=InnoDB COLLATE utf8mb4_0900_ai_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from conversation_threads table:
+thread_id   conversation    created_at      updated_at
+whatsapp:+917405483252      [{'role': 'user', 'content': 'Can you tell me I am in which team and what is my name', 'timestamp':     2025-12-24 12:43:53     2025-12-24 12:58:14
+whatsapp:+917490897651      [{'role': 'user', 'content': 'Hi', 'timestamp': '2025-12-24 13:13:05'}, {'role': 'assistant', 'conte    2025-12-24 13:13:05     2025-12-24 13:13:53
+whatsapp:+918511036018      [{'role': 'user', 'content': 'Let me know the games for friday', 'timestamp': '2025-12-24 15:52:25'}    2025-12-24 15:52:25     2025-12-24 15:58:49
+*/
+
+
+CREATE TABLE schedules (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    date DATE, 
+    day VARCHAR(20), 
+    duration VARCHAR(20), 
+    start_time TIME, 
+    end_time TIME, 
+    expected_end_time TIME, 
+    reporting_time TIME, 
+    team1_group VARCHAR(50), 
+    team1_name VARCHAR(50), 
+    team1_chapter_id INTEGER, 
+    team1_id INTEGER, 
+    team2_group VARCHAR(50), 
+    team2_name VARCHAR(50), 
+    team2_chapter_id INTEGER, 
+    team2_id INTEGER, 
+    stage VARCHAR(50), 
+    game_id INTEGER, 
+    PRIMARY KEY (id), 
+    CONSTRAINT fk_schedule_team1 FOREIGN KEY(team1_id) REFERENCES tbl_teams (team_id), 
+    CONSTRAINT fk_schedule_team2 FOREIGN KEY(team2_id) REFERENCES tbl_teams (team_id), 
+    CONSTRAINT fk_schedules_games FOREIGN KEY(game_id) REFERENCES tbl_games (g_id) ON DELETE CASCADE ON UPDATE CASCADE
+)ENGINE=InnoDB COLLATE utf8mb4_0900_ai_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from schedules table:
+id  date    day     duration        start_time      end_time        expected_end_time       reporting_time  team1_group     team1_name      team1_chapter_id        team1_id        team2_group     team2_name      team2_chapter_id       team2_id        stage   game_id
+1   2025-12-14      Sunday  25 mins 18:00:00        18:25:00        18:25:00        17:30:00        A1      Makarios        36      None    A2      Hades & Anatolius       79      None    League  20
+2   2025-12-14      Sunday  25 mins 18:30:00        18:55:00        18:55:00        18:00:00        C1      Olympus 41      None    C2      Osiris  42      None    League  20
+3   2025-12-14      Sunday  25 mins 19:00:00        19:25:00        19:25:00        18:30:00        D1      Vinci   53      None    D2      Eros    72      None    League  20
+*/
+
+
+CREATE TABLE sports_rules (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    chapter_size VARCHAR(40) NOT NULL, 
+    sr_no INTEGER NOT NULL, 
+    category ENUM('Individual','Team') NOT NULL, 
+    sport VARCHAR(50) NOT NULL, 
+    details VARCHAR(100), 
+    event_type VARCHAR(60), 
+    playing_players VARCHAR(20), 
+    total_squad_size VARCHAR(20), 
+    limitation_notes VARCHAR(255), 
+    max_participation_per_chapter VARCHAR(255) NOT NULL, 
+    PRIMARY KEY (id)
+)ENGINE=InnoDB COLLATE utf8mb4_0900_ai_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from sports_rules table:
+id  chapter_size    sr_no   category        sport   details event_type      playing_players total_squad_size        limitation_notes        max_participation_per_chapter
+1   Above 75        1       Individual      Badminton       Singles, Doubles, Mixed Doubles Knockout        None    None    One person can take part in only two events     Singles - 5+5 (M+F), Doubles - 3+3 Teams (M+F), Mixed - 2 Team
+2   Above 75        2       Individual      Carrom  Mixed Doubles   Knockout        None    None    None    Doubles - 2 Teams
+3   Above 75        3       Individual      Chess   Individual      Event   None    None    None    Singles - 5+5 (M+F)
+*/
+
+
+CREATE TABLE tbl_chapters (
+    c_id INTEGER NOT NULL AUTO_INCREMENT, 
+    name VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    status INTEGER NOT NULL DEFAULT '1', 
+    gold INTEGER NOT NULL DEFAULT '0', 
+    silver INTEGER NOT NULL DEFAULT '0', 
+    bronze INTEGER NOT NULL DEFAULT '0', 
+    total INTEGER NOT NULL DEFAULT '0', 
+    game_type VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    PRIMARY KEY (c_id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_chapters table:
+c_id        name    status  gold    silver  bronze  total   game_type
+1   Acreseus        0       0       0       0       0       None
+2   Acropolis       0       0       0       0       0       None
+3   Altimus 0       0       0       0       0       None
+*/
+
+
+CREATE TABLE tbl_game_chapter_group_mapping (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    c_id INTEGER NOT NULL, 
+    g_id INTEGER NOT NULL, 
+    group_code VARCHAR(5) NOT NULL, 
+    combined_name VARCHAR(100) NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT fk_gcm_chapter FOREIGN KEY(c_id) REFERENCES tbl_chapters (c_id) ON DELETE CASCADE ON UPDATE CASCADE, 
+    CONSTRAINT fk_gcm_game FOREIGN KEY(g_id) REFERENCES tbl_games (g_id) ON DELETE CASCADE ON UPDATE CASCADE
+)ENGINE=InnoDB COLLATE utf8mb4_0900_ai_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_game_chapter_group_mapping table:
+id  c_id    g_id    group_code      combined_name
+1   40      22      A1      Oliver - A1
+2   74      22      A2      Nikolaus - A2
+3   50      22      A3      Raphael - A3
+*/
+
+
+CREATE TABLE tbl_games (
+    g_id INTEGER NOT NULL AUTO_INCREMENT, 
+    category VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    sport_name VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    game_type VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    icon VARCHAR(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    playing INTEGER NOT NULL, 
+    total INTEGER NOT NULL, 
+    max_participation INTEGER NOT NULL, 
+    sport_type VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    male INTEGER NOT NULL, 
+    female INTEGER NOT NULL, 
+    mix INTEGER NOT NULL, 
+    venue VARCHAR(150) COLLATE utf8mb4_general_ci, 
+    PRIMARY KEY (g_id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_games table:
+g_id        category        sport_name      game_type       icon    playing total   max_participation       sport_type      male    female  mix     venue
+1   Individual      Tennis  Singles assets/icons/tennis.png 1       1       5       Knockout        5       5       1       Veer Savarkar Sports Complex
+2   Individual      Tennis  Doubles assets/icons/tennis.png 1       1       5       Knockout        5       5       1       Veer Savarkar Sports Complex
+3   Individual      Tennis  Mixed Doubles   assets/icons/tennis.png 1       1       2       Knockout        1       1       1       Veer Savarkar Sports Complex
+*/
+
+
+CREATE TABLE tbl_login (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    username VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    password VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    chapter VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `role` VARCHAR(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    PRIMARY KEY (id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_login table:
+id  username        password        chapter role
+1   admin   4M1X22D         a
+2   acreseus        AME0P863        1       c
+3   acropolis       9P5WM27Z        2       c
+*/
+
+
+CREATE TABLE tbl_login_bak (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    username VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    password VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    chapter VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `role` VARCHAR(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    PRIMARY KEY (id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_login_bak table:
+id  username        password        chapter role
+1   admin   Q4iuE8T7                a
+2   altimus G7pyI0F9        1       c
+3   anatolius       V0rlQ5E0        2       c
+*/
+
+
+CREATE TABLE tbl_members (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    name VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    chapter VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    or_chapter VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    company VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    gender VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    captain VARCHAR(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    email VARCHAR(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    contact VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    noofsport INTEGER NOT NULL DEFAULT '0', 
+    tshirt VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    tennis INTEGER DEFAULT '0', 
+    tt INTEGER DEFAULT '0', 
+    badminton INTEGER DEFAULT '0', 
+    pickleball INTEGER DEFAULT '0', 
+    PRIMARY KEY (id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_members table:
+id  name    chapter or_chapter      company gender  captain email   contact noofsport       tshirt  tennis  tt      badminton       pickleball
+1   ARPIT CHAMPANERIA       Magnus          Real Estate Services    Male                    8511665050      1       XL - 42 0       0       0       0
+2   GROWBIZZ INDIA CONSULTANTS      Ares & Acreseus Acreseus        Legal & Accounting      Male                    9998962014      0       0       0       0       0       0
+3   Darshan Sheth   Magnus          Retail  Female                  9913537533      0       0       0       0       0       0
+*/
+
+
+CREATE TABLE tbl_team_members (
+    tm_id INTEGER NOT NULL AUTO_INCREMENT, 
+    team INTEGER NOT NULL, 
+    `member` INTEGER NOT NULL, 
+    PRIMARY KEY (tm_id), 
+    CONSTRAINT fk_tbl_team_members_member FOREIGN KEY(`member`) REFERENCES tbl_members (id) ON DELETE CASCADE ON UPDATE CASCADE, 
+    CONSTRAINT fk_team_members_team FOREIGN KEY(team) REFERENCES tbl_teams (team_id) ON DELETE CASCADE ON UPDATE CASCADE
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_team_members table:
+tm_id       team    member
+801 295     1
+5361        2469    4
+8679        3846    5
+*/
+
+
+CREATE TABLE tbl_teams (
+    team_id INTEGER NOT NULL AUTO_INCREMENT, 
+    sport INTEGER NOT NULL, 
+    type VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci, 
+    chapter INTEGER NOT NULL, 
+    PRIMARY KEY (team_id), 
+    CONSTRAINT fk_team_chapter FOREIGN KEY(chapter) REFERENCES tbl_chapters (c_id), 
+    CONSTRAINT fk_team_sport FOREIGN KEY(sport) REFERENCES tbl_games (g_id), 
+    CONSTRAINT fk_teams_chapter FOREIGN KEY(chapter) REFERENCES tbl_chapters (c_id) ON DELETE CASCADE ON UPDATE CASCADE
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_teams table:
+team_id     sport   type    chapter
+9   22      Mixed   35
+10  23      Mixed   35
+11  19      Mixed   35
+*/
+
+
+CREATE TABLE tbl_winners (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    sport VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `Category` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `Chapter` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `Member` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    `Medal` ENUM('Gold','Silver','Bronze') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL, 
+    PRIMARY KEY (id)
+)ENGINE=InnoDB COLLATE utf8mb4_general_ci DEFAULT CHARSET=utf8mb4
+
+/*
+3 rows from tbl_winners table:
+id  sport   Category        Chapter Member  Medal
+1   31      Mixed   36      152     Gold
+2   31      Mixed   23      3193    Silver
+3   31      Mixed   33      1612    Bronze
+*/
