@@ -697,25 +697,20 @@ class AgentNodes:
         logger.critical(f"Executed SQL Query Result: {last_msg_content}")
         sql_query = None
 
+        # Check if the last message is empty or contains error keywords
         ERROR_KEYWORDS = [
-                "error",
-                "ERROR"
-                "exception",
+                "error","ERROR","exception",
                 "failed",
                 "no rows",
                 "not found",
                 "null",
-                "none"
+                "none",
                 "Error"
             ]
 
-        if (
-                not last_msg_content
-                or not str(last_msg_content).strip()
-                or any(keyword in str(last_msg_content).lower() for keyword in ERROR_KEYWORDS)
-            ):
+        if (not last_msg_content or not str(last_msg_content).strip() or 
+            any(keyword in str(last_msg_content).lower() for keyword in ERROR_KEYWORDS)):
                 logger.warning("SQL output empty or error detected. Skipping LLM call.")
-                
                 fallback_message = (
                     "The details are not available at the moment.\n\n"
                     "Please check back later or contact the Sicilian Games team for confirmation."
