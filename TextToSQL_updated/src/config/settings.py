@@ -95,7 +95,7 @@ class Settings:
         )
 
         llm_config = LLMConfig(
-            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            model=os.getenv("LLM_MODEL", "gpt-5-mini"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0")),
             max_tokens=None,
             timeout=None,
@@ -106,14 +106,15 @@ class Settings:
             )
             
         llm_without_reasoning_config = LLMWithoutReasoningConfig(
-            model=os.getenv("LLM_WITHOUT_REASONING_MODEL", "gpt-4o-mini"),
+            model=os.getenv("LLM_WITHOUT_REASONING_MODEL", "gpt-5-nano"),
             temperature=float(os.getenv("LLM_WITHOUT_REASONING_TEMPERATURE", "0")),
             max_tokens=None,
             timeout=None,
             max_retries=int(os.getenv("LLM_WITHOUT_REASONING_MAX_RETRIES", "2")),
+            api_key=os.getenv("OPENAI_API_KEY", ""),
             reasoning_effort=os.getenv("LLM_WITHOUT_REASONING_REASONING_EFFORT", "minimal"),
             max_reasoning_tokens=int(os.getenv("LLM_WITHOUT_REASONING_MAX_REASONING_TOKENS", "0")),
-            api_key=os.getenv("OPENAI_API_KEY", ""),
+         
             )
             
         twilio_config = TwilioConfig(

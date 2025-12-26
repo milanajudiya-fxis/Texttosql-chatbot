@@ -52,7 +52,7 @@ class AgentGraphBuilder:
         builder.add_node("classify_query", self.nodes.classify_query)  # Classification node
         builder.add_node("answer_general", self.nodes.answer_general)  # General answer node
         builder.add_node("answer_from_previous_conversation", self.nodes.answer_from_previous_conversation)
-        builder.add_node("web_search", self.nodes.web_search_node)  # Web search node
+        # builder.add_node("web_search", self.nodes.web_search_node)  # Web search node
         builder.add_node("list_db_tables", self.nodes.list_tables) # List tables node
         builder.add_node("call_get_schema", self.nodes.call_get_schema_file) # Call get schema node
         builder.add_node("get_schema", ToolNode([self.toolkit.get_schema_tool_obj()], name="get_schema"))
