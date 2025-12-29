@@ -283,7 +283,7 @@ class AgentNodes:
             # If no keywords matched, default to Schedule + Index (most common)
             if not target_ids:
                 logger.warning("No keywords matched. Defaulting to Schedule & Index.")
-                target_ids = {"/schedule.php", "/index.php", "/winners.php"}
+                target_ids = {"/schedule.php", "/index.php", "/winners.php", "/standing.php"}
             else:
                 logger.info(f"Context filtering matched: {target_ids}")
 

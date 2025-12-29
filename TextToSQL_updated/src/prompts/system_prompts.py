@@ -52,6 +52,7 @@ def get_classify_query_prompt() -> str:
       - Victory information
       - Championship results
       - Any variation asking about winners
+      - Team points table
 
       ### IDENTITY-DEPENDENT WINNER RULE (CRITICAL OVERRIDE)
 
@@ -69,6 +70,12 @@ def get_classify_query_prompt() -> str:
       Once identity is known, ALL winner queries MUST go to IN_DOMAIN_WEB_SEARCH.
       NO EXCEPTIONS after identity resolution.
 
+      ## ⚠️ STANDINGS & MEDAL TALLY RULE (MANDATORY) ⚠️
+
+      ANY query about points table, standings, rankings, positions, leaderboards, or medal tallies (gold/silver/bronze) for any team or chapter MUST ALWAYS be classified as:
+      IN_DOMAIN_WEB_SEARCH
+
+      This applies regardless of whether a team or chapter name is mentioned.
 
       ---
 
@@ -115,6 +122,7 @@ def get_classify_query_prompt() -> str:
       - Event partners
       - Owners / organizers
       - Organizer contact details
+      - Team points table 
 
       MANDATORY RULES:
       - ALL winner queries MUST use IN_DOMAIN_WEB_SEARCH
@@ -141,7 +149,6 @@ def get_classify_query_prompt() -> str:
       - Squads
       - Venues
       - Sports rules
-      - Points tables
       - Games and categories
 
       STRICT RULES:
@@ -216,6 +223,9 @@ def get_classify_query_prompt() -> str:
       answer: IN_DOMAIN_WEB_SEARCH
 
       question: "Give me the points table / standings of all chapters"
+      answer: IN_DOMAIN_WEB_SEARCH
+
+      question: "Need to know about maximus chapter and standing"
       answer: IN_DOMAIN_WEB_SEARCH
 
       question: "When will be the next volleyball match of Athena team?"
