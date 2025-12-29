@@ -962,40 +962,6 @@ class AgentNodes:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     # def classify_query_updated(self, state: MessagesState):
     #     """Classify whether query is related to database or general question."""
     #     import re
@@ -1065,36 +1031,6 @@ class AgentNodes:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     # getting schema of the all tables listed in the previous node ( all db tables) (manual tool call)
     # def call_get_schema(self, state: MessagesState):
     #     """Get database schema"""
@@ -1141,74 +1077,3 @@ class AgentNodes:
     #     logger.info("---------------------"*8)
 
     #     return {"messages": [response]}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

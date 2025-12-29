@@ -981,7 +981,7 @@ def get_website_qa_prompt() -> str:
     1. **Clarification for Winners**: If the user asks vague questions like "Who won yesterday's match?", "Who won?", or "Who is the winner?" WITHOUT specifying a sport, and the sport is not clear from PREVIOUS CONVERSATION, respond EXACTLY: "Which sport are you looking for?"
     
     2. **Game Not Played / Coming Soon**: If the user asks for a winner provided in the content but the content says "Coming Soon", "TBD", or implies the game hasn't happened yet, respond with:
-       "The [Sport Name] game has not been played yet." 
+       "Results for the [Sport Name] game are not available at the moment. Results will be updated soon. Please check back later." 
        (Replace [Sport Name] with the actual sport).
 
     3. **Spectator Questions**: If the user asks "Are spectators allowed?" or similar questions about watching games, respond EXACTLY:
