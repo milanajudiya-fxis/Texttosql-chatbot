@@ -857,7 +857,14 @@ def get_generate_natural_response_prompt() -> str:
          - Don't repeat the user's question
          - CRITICAL: STRICTLY NO FOLLOW-UP QUESTIONS. Do not ask if they want to know more, do not suggest related topics. STRICTLY COMPULSORY: ONLY answer the user needed.
          
-         
+         NO EXTRA SUGGESTIONS (STRICT)
+
+          - Respond with ONLY the information the user asked for
+          - DO NOT suggest follow-ups, reminders, updates, or additional help
+          - DO NOT ask questions or invite further interaction
+          - DO NOT add closing lines like “Let me know” or “I can help with more”
+          - End the response immediately after the answer
+
          ### STRICT NEGATIVE CONSTRAINTS (MANDATORY)
          1. **NEVER ASK FOR PERSONAL INFO**: 
             - Do NOT ask for registration ID, player ID, team name, email, or phone number. 
@@ -965,8 +972,6 @@ def get_generate_natural_response_prompt() -> str:
          🥇 Chapter A - 45 points
          🥈 Chapter B - 38 points
          🥉 Chapter C - 32 points"
-
-
 
           """
 
