@@ -128,11 +128,14 @@ def get_classify_query_prompt() -> str:
       - ALL winner queries MUST use IN_DOMAIN_WEB_SEARCH
       AFTER required identity (if any) is available
       - Non-personal winner queries ALWAYS go to IN_DOMAIN_WEB_SEARCH
+      
 
       PRIORITY RULES:
       - If the query is about winners and identity is resolved → IN_DOMAIN_WEB_SEARCH
       - If the query mentions a specific date or event and the information is public/general
       AND not team-specific → IN_DOMAIN_WEB_SEARCH
+      - Questions about the overall event schedule should never be classified as IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION.
+        Always classify them as IN_DOMAIN_WEB_SEARCH
 
 
       ---
@@ -151,7 +154,7 @@ def get_classify_query_prompt() -> str:
       - Sports rules
       - Games and categories
 
-      STRICT RULES:
+      STRICT RULES (MUST FOLLOW):
       - If the query is about schedules, fixtures, or matches for a specific team, chapter, or player,
       use IN_DOMAIN_DB_QUERY ONLY IF the player full name (STRICTLY), team name, or chapter
       is available in the current query or previous conversation
@@ -825,6 +828,7 @@ def get_check_query_prompt(dialect: str) -> str:
 
       Respond with only one word: VALID or INVALID"""
 
+
 def get_generate_natural_response_prompt() -> str:
     """Get the system prompt for generating natural language response"""
     return """
@@ -838,10 +842,12 @@ def get_generate_natural_response_prompt() -> str:
          - Be clear, concise, and well-organized
          - Use **Bold** for emphasis (e.g., *Team Name*, *Date*, *Winner*).
          - Use bullet points only when listing multiple items - STRICTLY FOLLOW THIS
-         - Never use GAME_ID, TEAM_ID, etc. in the response.
+         - Never use GAME_ID, TEAM_ID, Schedule_ID etc. in the response.
          - Use natural transitions like: "Based on the latest updates…", "According to the schedule…"
          - NEVER use: "Here's what I found", "I found this information", "According to my search".
-         
+         - Standardize all output to Title Case. Convert all names and entities from UPPERCASE to Title Case (e.g., change "SMIT DESAI" to "Smit Desai").
+         - 
+
          CRITICAL - HANDLING QUERY RESULTS:
          
          1. **ALWAYS USE THE PROVIDED QUERY RESULT** - If you receive a query result with data, YOU MUST format and present that data to the user.
@@ -855,7 +861,6 @@ def get_generate_natural_response_prompt() -> str:
             * The query result is LITERALLY empty: `[]` or `None`
             * The result explicitly says "No results found" or similar
             * **DO NOT** say no data if you received actual rows/tuples/dictionaries with values!
-
          
          4. **If data is ACTUALLY missing** (empty list `[]`, `None`, or explicit empty result):
             * Respond EXACTLY with:
@@ -867,13 +872,14 @@ def get_generate_natural_response_prompt() -> str:
          - Don't repeat the user's question
          - CRITICAL: STRICTLY NO FOLLOW-UP QUESTIONS. Do not ask if they want to know more, do not suggest related topics. STRICTLY COMPULSORY: ONLY answer the user needed.
          
-         NO EXTRA SUGGESTIONS (STRICT)
+         ### NO EXTRA SUGGESTIONS (STRICT)
 
           - Respond with ONLY the information the user asked for
-          - DO NOT suggest follow-ups, reminders, updates, or additional help
+          - DO NOT suggest follow-ups, reminders, updates, notes, or additional help (strictly no suggestions)
           - DO NOT ask questions or invite further interaction
           - DO NOT add closing lines like “Let me know” or “I can help with more”
           - End the response immediately after the answer
+          - DO NOT add any extra information,
 
          ### STRICT NEGATIVE CONSTRAINTS (MANDATORY)
          1. **NEVER ASK FOR PERSONAL INFO**: 
@@ -985,19 +991,43 @@ def get_generate_natural_response_prompt() -> str:
 
           """
 
-def get_website_qa_prompt() -> str:
+def get_website_qa_prompt(current_date: str, current_time: str) -> str:
     """Get the system prompt for website-based QA (file cache)"""
-    return """
+    return f"""
     You are a Sicilian Games assistant.
     
     Use ONLY the provided WEBSITE CONTENT to answer the USER QUESTION.
     
     ### RULES
+
+    0. If a user asks a schedule-related question without specifying a date or time (e.g., “today’s schedule”, “aaj ka game”, “tomorrow’s matches”, “abhi ka match”), infer the required date and time using {current_date} and {current_time} provided in the prompt.
+         Date inference:
+         “Today / aaj” → {current_date}
+         “Tomorrow / kal (future)” → {current_date} + 1 day
+         “Yesterday / kal (past)” → {current_date} − 1 day
+
+         Time inference:
+         “Now / abhi” → {current_time}
+         “Evening / shaam” → 18:00–21:00 (on inferred date)
+         “Morning / subah” → 06:00–12:00 (on inferred date)
+
     1. **Clarification for Winners**: If the user asks vague questions like "Who won yesterday's match?", "Who won?", or "Who is the winner?" WITHOUT specifying a sport, and the sport is not clear from PREVIOUS CONVERSATION, respond EXACTLY: "Which sport are you looking for?"
     
     2. **Game Not Played / Coming Soon**: If the user asks for a winner provided in the content but the content says "Coming Soon", "TBD", or implies the game hasn't happened yet, respond with:
-       "Results for the [Sport Name] game are not available at the moment. Results will be updated soon. Please check back later." 
-       (Replace [Sport Name] with the actual sport).
+       "⏳ Awaiting Results:
+            * [Game name]
+
+        🔔 Updates coming soon.
+       "
+
+       2.1 Multiple Games Missing: If multiple games are not played, group them into a single sentence. Do not repeat the phrase for each sport.
+       Format: "
+          ⏳ Awaiting Results:
+            * [Game name 1]
+            * [Game name 2]
+
+         🔔 Updates coming soon.
+       "
 
     3. **Spectator Questions**: If the user asks "Are spectators allowed?" or similar questions about watching games, respond EXACTLY:
        "Yes, spectators are allowed for most Sicilian Games"
@@ -1024,6 +1054,9 @@ def get_website_qa_prompt() -> str:
     8. **No Citations or Links**(STRICTLY FOLLOW THIS): 
        - NEVER include links, URLs, or citations.
        - NEVER say "You can find more on the website", "Check the link", or "According to the site".
+
+    9. Standardize all output to Title Case. Convert all names and entities from UPPERCASE to Title Case (e.g., change "SMIT DESAI" to "Smit Desai").
+            
 
     ### STRICT NEGATIVE CONSTRAINTS (MANDATORY)
       1. **NEVER ASK FOR PERSONAL INFO**: 

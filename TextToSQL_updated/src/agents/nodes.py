@@ -14,6 +14,8 @@ import requests
 from bs4 import BeautifulSoup
 import os
 from langchain_core.tools import tool
+from datetime import datetime
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -300,8 +302,15 @@ class AgentNodes:
             else:
                 content = "\n".join(final_content_parts)
                 logger.critical(f"Reduced context size from {len(full_html)} to {len(content)} chars. Filtering took: {time.time() - parse_start:.4f}s")
-
-            system_prompt=get_website_qa_prompt()
+   
+            ist = pytz.timezone("Asia/Kolkata")
+            now_ist = datetime.now(ist)
+            current_date = now_ist.strftime("%Y-%m-%d")
+            current_time = now_ist.strftime("%H:%M:%S")
+            logger.critical(f"Current Date: {current_date}")
+            logger.critical(f"Current Time: {current_time}")
+            
+            system_prompt=get_website_qa_prompt(current_date,current_time)
 
             prompt = f"""
             {system_prompt}
@@ -703,8 +712,6 @@ class AgentNodes:
                 "failed",
                 "no rows",
                 "not found",
-                "null",
-                "none",
                 "Error"
             ]
 
