@@ -432,6 +432,30 @@ class AgentNodes:
         logger.info("---------------------"*4)
         return {"messages": [response]}
 
+    # RULEBOOK NODE
+    def rulebook_node(self, state: MessagesState):
+        """Handle rulebook requests and attach PDF link"""
+        start_time = time.time()
+        logger.warning("************** RULEBOOK NODE **************")
+        rulebook_url = os.getenv("RULEBOOK_URL", "https://sicilian-games-7451.twil.io/Game%20Rules%20-%20Sicilian%20Games%202025.pdf")
+        message_content = (
+            "Here is the official Sicilian Games Rulebook. 📄\n\n"
+            "You can download the PDF to check the detailed rules for all sports."
+        )
+
+        response = AIMessage(
+            content=message_content,
+            additional_kwargs={
+                "media_url": rulebook_url,
+                "media_type": "application/pdf"
+            }
+        )
+        logger.warning(f"Message state: {state}")
+        logger.info(f"Serving Rulebook PDF: {rulebook_url}")
+        logger.critical(f"rulebook_node completed in {time.time() - start_time:.2f} seconds")
+        logger.info("---------------------"*4)
+        return {"messages": [response]}
+
     def list_tables(self, state: MessagesState):
         """List available tables and load conversation history if available"""
         messages = []

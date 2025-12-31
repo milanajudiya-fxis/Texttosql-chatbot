@@ -49,7 +49,7 @@ def split_message(message: str, max_length: int = 1400) -> list[str]:
 
 
 
-def send_whatsapp_message(to_number: str, message: str):
+def send_whatsapp_message(to_number: str, message: str, media_url: str = None):
     """
     Send WhatsApp message using Twilio.
     If message <= 1400 chars, sends directly.
@@ -62,29 +62,39 @@ def send_whatsapp_message(to_number: str, message: str):
         from src.core.dependencies import get_twilio_client, get_conversation_manager
         client = get_twilio_client()
         settings = Settings.from_env()
-
+        
         # Check message length and send accordingly
         if len(message) <= 1400:
-            logger.debug(f"Message length {len(message)} chars - sending directly")
-            msg = client.messages.create(
-                body=message,
-                from_=settings.twilio.from_number,
-                to=f"whatsapp:{to_number}"
-            )
+            logger.warning(f"Message length {len(message)} chars - sending directly")
+            msg_params = {
+                "body": message,
+                "from_": settings.twilio.from_number,
+                "to": f"whatsapp:{to_number}"
+            }
+            if media_url:
+                msg_params["media_url"] = [media_url]
+                
+            msg = client.messages.create(**msg_params)
+            logger.warning(f"Final Message: {msg_params}")
             logger.info("WhatsApp message sent successfully")
             return [msg.sid]
         else:
             # Split and send multiple messages
             message_parts = split_message(message)
-            logger.debug(f"Message length {len(message)} chars - split into {len(message_parts)} chunk(s)")
+            logger.warning(f"Message length {len(message)} chars - split into {len(message_parts)} chunk(s)")
             
             sids = []
             for part in message_parts:
-                msg = client.messages.create(
-                    body=part,
-                    from_=settings.twilio.from_number,
-                    to=f"whatsapp:{to_number}"
-                )
+                msg_params = {
+                    "body": part,
+                    "from_": settings.twilio.from_number,
+                    "to": f"whatsapp:{to_number}"
+                }
+                # Attach media to the last part if it exists
+                if media_url and part == message_parts[-1]:
+                    msg_params["media_url"] = [media_url]
+
+                msg = client.messages.create(**msg_params)
                 sids.append(msg.sid)
             
             logger.info(f"WhatsApp message(s) sent successfully ({len(sids)} parts)")
@@ -203,9 +213,15 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str, messag
         conversation_manager.save_message(thread_id, "assistant", result)
         conversation_manager.close()
         
+        # Extract media_url from additional_kwargs if available
+        media_url = None
+        if final_message and hasattr(final_message, "additional_kwargs"):
+            media_url = final_message.additional_kwargs.get("media_url")
+        
         # Send response via Twilio
         user_number = from_number.replace("whatsapp:", "")
-        send_whatsapp_message(user_number, result)
+        logger.critical(f"RULE BOOK: {media_url}")
+        send_whatsapp_message(user_number, result, media_url=media_url)
         
         elapsed_time = time.time() - start
         logger.critical(f"Task completed successfully in {elapsed_time:.2f}s")

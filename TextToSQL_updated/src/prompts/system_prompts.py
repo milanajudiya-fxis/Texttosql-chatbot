@@ -181,6 +181,32 @@ def get_classify_query_prompt() -> str:
 
       ---
 
+     ### 5. RULE_BOOK
+
+      Use this classification **whenever the user asks anything related to rules or a rulebook**, including but not limited to:
+      - Requests for a **rulebook**, **rules PDF**, **official documents**, or **guides**
+      - Questions about **rules of any sport or game**  
+      (e.g., *cricket rules*, *badminton rules*, *football rules*, *tennis rules*)
+      - Queries that imply **downloading, sharing, or sending rule-related files**
+
+      #### MANDATORY CLASSIFICATION RULE
+
+      - **Any question related to a rulebook, sports rules, or game rules must ALWAYS be classified as `RULE_BOOK`.**
+      - This rule applies **regardless of phrasing, intent, or similarity to previous queries**.
+
+      #### STRICT RESTRICTIONS
+
+      - **Do NOT refer to or rely on previous conversations**, even if a similar rulebook-related question exists.
+      - **Never classify rulebook-related queries as `IN_DOMAIN_WITHIN_PREVIOUS_CONVERSATION`.**
+      - **Never classify rulebook-related queries as `WEB_SEARCH` or `DB_QUERY`.**
+
+      #### ABSOLUTE PRIORITY
+
+      If a query mentions or implies **rules**, **rulebooks**, or **official game regulations**,  
+      `RULE_BOOK` classification **takes precedence over all other categories** without exception.
+
+      ---
+
       ## ADDITIONAL OVERRIDE RULE
 
       If:
@@ -203,6 +229,7 @@ def get_classify_query_prompt() -> str:
       - IN_DOMAIN_WEB_SEARCH
       - IN_DOMAIN_DB_QUERY
       - OUT_OF_DOMAIN
+      - RULE_BOOK
 
       NO explanations.
       NO additional text.
