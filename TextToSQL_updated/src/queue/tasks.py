@@ -47,8 +47,6 @@ def split_message(message: str, max_length: int = 1400) -> list[str]:
     
     return parts
 
-
-
 def send_whatsapp_message(to_number: str, message: str, media_url: str = None):
     """
     Send WhatsApp message using Twilio.
@@ -107,7 +105,6 @@ def send_whatsapp_message(to_number: str, message: str, media_url: str = None):
         )
         return None
 
-
 def send_typing_indicator(message_sid: str):
     """
     Send Twilio WhatsApp typing indicator.
@@ -133,7 +130,6 @@ def send_typing_indicator(message_sid: str):
             
     except Exception as e:
         logger.error(f"Error sending typing indicator: {e}")
-
 
 def process_whatsapp_message(body: str, from_number: str, to_number: str, message_sid: str = None):
     """
@@ -217,10 +213,11 @@ def process_whatsapp_message(body: str, from_number: str, to_number: str, messag
         media_url = None
         if final_message and hasattr(final_message, "additional_kwargs"):
             media_url = final_message.additional_kwargs.get("media_url")
+            logger.warning(f"RULE BOOK MEDIA URL: {media_url}")
         
         # Send response via Twilio
         user_number = from_number.replace("whatsapp:", "")
-        logger.critical(f"RULE BOOK: {media_url}")
+        
         send_whatsapp_message(user_number, result, media_url=media_url)
         
         elapsed_time = time.time() - start

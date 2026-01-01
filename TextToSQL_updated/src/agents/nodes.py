@@ -90,7 +90,6 @@ class AgentNodes:
         logger.critical(f"fetch conversation node completed in {time.time() - start_time:.2f} seconds")
         logger.info("---------------------"*4)
         return state
-    
     # CLASSIFY  - LLM REASONING 
     def classify_query(self, state: MessagesState):
         """Classify whether query is related to database or general question."""
@@ -191,7 +190,7 @@ class AgentNodes:
         def clean_html(html):
             soup = BeautifulSoup(html, "html.parser")
             # Remove scripts, styles, etc.
-            for tag in soup(["script", "style", "noscript", "iframe", "svg", "header", "footer"]):
+            for tag in soup(["script", "style", "noscript", "iframe", "svg", "header", "footer", "img"]):
                 tag.decompose()
             
             # Return body content (preserving tags) or full html
@@ -264,30 +263,96 @@ class AgentNodes:
             logger.info(f"HTML Parsing took: {time.time() - parse_start:.4f}s")
             
             # 1. Define Keyword Mapping
+            # relevant_sections = []
+            # query_lower = user_query.lower()
+            
+            # mapping = {
+            #     "/winners.php": ["won","winner","victory","champion","result","gold","silver","Tennis","Table Tennis","Squash","Snooker","Pool","Badminton","Chess","Fitness/Endurance","Pickleball","Padel Ball","Carrom","Karting","Volleyball","Basketball","Football","Box Cricket","Cricket","Tug Of War","Dodge Ball"],
+            #     "/standing.php": ["standing","standings","rank","ranking","position","table","points","point","points table","points tally","leaderboard","leader","top team","bottom team","first place","last place","current standings","latest standings","updated standings","overall standings","which team","which state","who won","who has","winner","won","leading","topped","most","maximum","highest","medal tally","medal table","medals won","total medals","gold medals","silver medals","bronze medals","gold medal count","silver medal count","bronze medal count","highest gold medal","highest silver medal","highest bronze medal","most gold medal","most silver medal","most bronze medal","maximum gold medal","maximum silver medal","maximum bronze medal","lowest gold medal","lowest silver medal","lowest bronze medal"],
+            #     "/schedule.php": ["schedule", "match", "game", "time", "date", "play", "fixture", "next", "upcoming"],
+            #     "/contact.html": ["contact", "call", "email", "phone", "address", "reach"],
+            #     "/index.php": ["sponsor", "partner", "organizer", "about", "history", "sicilian"]
+            # }
+
+            # # 2. Identify relevant pages
+            # target_ids = set()
+            # for page_id, keywords in mapping.items():
+            #     if any(k in query_lower for k in keywords):
+            #         target_ids.add(page_id)
+            
+            # # 3. Extract key sections
+            # # If no keywords matched, default to Schedule + Index (most common)
+            # if not target_ids:
+            #     logger.warning("No keywords matched. Defaulting to Schedule & Index.")
+            #     target_ids = {"/schedule.php", "/index.php", "/winners.php", "/standing.php"}
+            # else:
+            #     logger.info(f"Context filtering matched: {target_ids}")
+
+            # 1. Define Keyword Mapping (Frequency based)
             relevant_sections = []
             query_lower = user_query.lower()
-            
+
             mapping = {
-                "/winners.php": ["won","winner","victory","champion","result","gold","silver","Tennis","Table Tennis","Squash","Snooker","Pool","Badminton","Chess","Fitness/Endurance","Pickleball","Padel Ball","Carrom","Karting","Volleyball","Basketball","Football","Box Cricket","Cricket","Tug Of War","Dodge Ball"],
-                "/standing.php": ["standing","standings","rank","ranking","position","table","points","point","points table","points tally","leaderboard","leader","top team","bottom team","first place","last place","current standings","latest standings","updated standings","overall standings","which team","which state","who won","who has","winner","won","leading","topped","most","maximum","highest","medal tally","medal table","medals won","total medals","gold medals","silver medals","bronze medals","gold medal count","silver medal count","bronze medal count","highest gold medal","highest silver medal","highest bronze medal","most gold medal","most silver medal","most bronze medal","maximum gold medal","maximum silver medal","maximum bronze medal","lowest gold medal","lowest silver medal","lowest bronze medal"],
-                "/schedule.php": ["schedule", "match", "game", "time", "date", "play", "fixture", "next", "upcoming"],
-                "/contact.html": ["contact", "call", "email", "phone", "address", "reach"],
-                "/index.php": ["sponsor", "partner", "organizer", "about", "history", "sicilian"]
+                "/winners.php": [
+                    "won","winner","victory","champion","result","gold","silver",
+                    "tennis","table tennis","squash","snooker","pool","badminton",
+                    "chess","fitness/endurance","pickleball","padel ball","carrom",
+                    "karting","volleyball","basketball","football","box cricket",
+                    "cricket","tug of war","dodge ball"
+                ],
+                "/standing.php": [
+                    "standing","standings","rank","ranking","position","table",
+                    "points","point","points table","points tally","leaderboard",
+                    "leader","top team","bottom team","first place","last place",
+                    "current standings","latest standings","updated standings",
+                    "overall standings","which team","which state","who won",
+                    "who has","winner","won","leading","topped","most","maximum",
+                    "highest","medal tally","medal table","medals won","total medals",
+                    "gold medals","silver medals","bronze medals", "gold", "silver", "bronze",
+                    "gold medal count","silver medal count","bronze medal count",
+                    "highest gold medal","highest silver medal","highest bronze medal",
+                    "most gold medal","most silver medal","most bronze medal",
+                    "maximum gold medal","maximum silver medal","maximum bronze medal",
+                    "lowest gold medal","lowest silver medal","lowest bronze medal"
+                ],
+                "/schedule.php": [
+                    "schedule","match","game","time","date","play","fixture","next","upcoming"
+                ],
+                "/contact.html": [
+                    "contact","call","email","phone","address","reach"
+                ],
+                "/index.php": [
+                    "sponsor","partner","organizer","about","history","sicilian"
+                ]
             }
 
-            # 2. Identify relevant pages
-            target_ids = set()
-            for page_id, keywords in mapping.items():
-                if any(k in query_lower for k in keywords):
-                    target_ids.add(page_id)
-            
-            # 3. Extract key sections
-            # If no keywords matched, default to Schedule + Index (most common)
-            if not target_ids:
-                logger.warning("No keywords matched. Defaulting to Schedule & Index.")
-                target_ids = {"/schedule.php", "/index.php", "/winners.php", "/standing.php"}
+            # 2. Count keyword matches per page
+            page_match_count = {}
+
+            for page, keywords in mapping.items():
+                count = sum(1 for keyword in keywords if keyword in query_lower)
+                if count > 0:
+                    page_match_count[page] = count
+
+            # 3. Select pages with maximum matches
+            if page_match_count:
+                max_count = max(page_match_count.values())
+                target_ids = {
+                    page for page, count in page_match_count.items()
+                    if count == max_count
+                }
+                logger.warning(f"Context filtering matched (max={max_count}): {target_ids}")
             else:
-                logger.info(f"Context filtering matched: {target_ids}")
+                # 4. Fallback when nothing matches
+                logger.warning("No keywords matched. Defaulting to common sections.")
+                target_ids = {
+                    "/schedule.php",
+                    "/index.php",
+                    "/winners.php",
+                    "/standing.php"
+                }
+
+
 
             final_content_parts = []
             for tid in target_ids:
@@ -437,7 +502,7 @@ class AgentNodes:
         """Handle rulebook requests and attach PDF link"""
         start_time = time.time()
         logger.warning("************** RULEBOOK NODE **************")
-        rulebook_url = os.getenv("RULEBOOK_URL", "https://sicilian-games-7451.twil.io/Game%20Rules%20-%20Sicilian%20Games%202025.pdf")
+        rulebook_url = os.getenv("RULEBOOK_URL", "https://sicilian-games-7670.twil.io/Game_Rules_Sicilian_Games_2025.pdf")
         message_content = (
             "Here is the official Sicilian Games Rulebook. 📄\n\n"
             "You can download the PDF to check the detailed rules for all sports."
@@ -801,10 +866,72 @@ class AgentNodes:
 
 
 
+# Frequency based keyword matching ------
 
 
 
+# relevant_sections = []
+# query_lower = user_query.lower()
 
+# mapping = {
+#     "/winners.php": [
+#         "won","winner","victory","champion","result","gold","silver",
+#         "tennis","table tennis","squash","snooker","pool","badminton",
+#         "chess","fitness/endurance","pickleball","padel ball","carrom",
+#         "karting","volleyball","basketball","football","box cricket",
+#         "cricket","tug of war","dodge ball"
+#     ],
+#     "/standing.php": [
+#         "standing","standings","rank","ranking","position","table",
+#         "points","point","points table","points tally","leaderboard",
+#         "leader","top team","bottom team","first place","last place",
+#         "current standings","latest standings","updated standings",
+#         "overall standings","which team","which state","who won",
+#         "who has","winner","won","leading","topped","most","maximum",
+#         "highest","medal tally","medal table","medals won","total medals",
+#         "gold medals","silver medals","bronze medals",
+#         "gold medal count","silver medal count","bronze medal count",
+#         "highest gold medal","highest silver medal","highest bronze medal",
+#         "most gold medal","most silver medal","most bronze medal",
+#         "maximum gold medal","maximum silver medal","maximum bronze medal",
+#         "lowest gold medal","lowest silver medal","lowest bronze medal"
+#     ],
+#     "/schedule.php": [
+#         "schedule","match","game","time","date","play","fixture","next","upcoming"
+#     ],
+#     "/contact.html": [
+#         "contact","call","email","phone","address","reach"
+#     ],
+#     "/index.php": [
+#         "sponsor","partner","organizer","about","history","sicilian"
+#     ]
+# }
+
+# # 2. Count keyword matches per page
+# page_match_count = {}
+
+# for page, keywords in mapping.items():
+#     count = sum(1 for keyword in keywords if keyword in query_lower)
+#     if count > 0:
+#         page_match_count[page] = count
+
+# # 3. Select pages with maximum matches
+# if page_match_count:
+#     max_count = max(page_match_count.values())
+#     target_ids = {
+#         page for page, count in page_match_count.items()
+#         if count == max_count
+#     }
+#     logger.info(f"Context filtering matched (max={max_count}): {target_ids}")
+# else:
+#     # 4. Fallback when nothing matches
+#     logger.warning("No keywords matched. Defaulting to common sections.")
+#     target_ids = {
+#         "/schedule.php",
+#         "/index.php",
+#         "/winners.php",
+#         "/standing.php"
+#     }
 
 
 
@@ -990,121 +1117,3 @@ class AgentNodes:
 
 
 
-
-
-
-    # def classify_query_updated(self, state: MessagesState):
-    #     """Classify whether query is related to database or general question."""
-    #     import re
-    #     start_time = time.time()
-    #     logger.warning("************** CLASSIFY QUERY **************")
-    #     logger.warning("LLM call:" + str(self.llm_call))
-        
-    #     messages = state["messages"]
-    #     # 3. EXTRACT CURRENT QUERY
-    #     current_query = messages[-1].content
-    #     self.user_query = current_query
-    #     logger.warning(f"Current query: {current_query}")
-
-    #     # --- GREETING BYPASS CHECK ---
-    #     # Regex to match common greetings (case-insensitive)
-    #     # Matches: "hi", "hello", "good morning", "whats app", "what's up", "hey", etc.
-    #     greeting_pattern = r"^\s*(hi|hu|ho|hii+|hey+|heyy+|hello+|helo|good\s*(morning|afternoon|evening|day)|what'?s\s*(up|going\s*on|new)|how\s*(are|r)\s*(you|u)|howdy|yo+|sup|namaste|namaskar|bonjour|ciao|guten\s*tag|konnichiwa|ohayo|shalom)\s*[!.?]*\s*$"
-        
-    #     if re.match(greeting_pattern, current_query, re.IGNORECASE):
-    #         logger.info(f"Greeting detected: {current_query}. Bypassing LLM classification.")
-    #         logger.info("Directly routing to OUT_OF_DOMAIN (General Answer)")
-    #         logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
-    #         logger.info("---------------------"*4)
-    #         # Create a mock AIMessage with the expected routing content
-    #         return {"messages": [AIMessage(content="OUT_OF_DOMAIN")]}
-    #     # -----------------------------
-
-    #     self.llm_call += 1
-    #     previous_conversation = messages[1:-1] if len(messages) > 2 else []
-    #     clean_previous_history = []
-    #     if previous_conversation:
-    #         for msg in previous_conversation:
-    #             role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
-    #             clean_previous_history.append({
-    #                 "role": role,
-    #                 "content": msg.content
-    #             })
-
-    #     system_message = get_classify_query_updated_prompt( 
-    #         previous_conversation=clean_previous_history,
-    #         current_query=current_query
-    #     )
-        
-    #     # llm_payload = {
-    #     #     "system_message": system_message,
-    #     #     "previous_conversation": clean_previous_history,
-    #     #     "current_query": current_query
-    #     # }
-
-    #     messages_for_llm = [
-    #         {
-    #             "role": "system",
-    #             "content": system_message
-    #         }
-    #     ]
-
-    #     llm = self.llm
-    #     logger.critical(f"llm --> gpt-4.1-mini")
-    #     response = llm.invoke(messages_for_llm)
-    #     decision = response.content.strip().upper()
-    #     logger.info(f"Classification result: {decision}")
-    #     logger.info(f"response content: {response}")
-    #     logger.critical(f"classify_query node completed in {time.time() - start_time:.2f} seconds")
-    #     logger.info("---------------------"*4)
-    #     return {"messages": [response]}
-
-
-
-
-    # getting schema of the all tables listed in the previous node ( all db tables) (manual tool call)
-    # def call_get_schema(self, state: MessagesState):
-    #     """Get database schema"""
-    #     start_time = time.time()
-    #     raw_tables = state["messages"][-1].content
-    #     tool_input = {
-    #         "table_names": raw_tables
-    #     }
-    #     tool_message = self.toolkit.get_schema_tool_obj().invoke(tool_input)
-    #     response= AIMessage(content=tool_message)
-    #     print("############################"*5)
-    #     logger.info(f"GET Schema Response: {response}")
-    #     logger.critical(f"call_get_schema node completed in {time.time() - start_time:.2f} seconds")
-    #     print("############################"*5)
-    #     return {"messages": [response]}
-    
-
-
-    # def get_relevant_schema_and_generate_query(self, state: MessagesState):
-    #     """Generate SQL query from natural language"""
-    #     start_time = time.time()
-    #     available_tables= state["messages"][-1].content 
-    #     print("11111111111111111111111111111111111111111")
-    #     print(available_tables)
-    #     print("11111111111111111111111111111111111111111")
-
-    #     system_message = {
-    #         "role": "system",
-    #         "content": get_generate_query_prompt(self.db_dialect, available_tables)
-    #                 + "\n\nReturn ONLY a SQL query. No explanations.",
-    #     }
-
-    #     llm = self.llm.bind_tools([self.toolkit.get_schema_tool_obj()])
-    #     response = llm.invoke([system_message] + state["messages"])
-    #     logger.info("############ GENERATE SQL QUERY #####################################################################")
-    #     logger.info("LLM call:" + str(self.llm_call))
-    #     self.llm_call += 1
-    #     logger.info(f"Dialect: {self.db_dialect}")
-    #     logger.info(f"Generated Query Response: {response}")
-    #     logger.info("-----------"*5)
-    #     logger.info(state["messages"])
-    #     logger.info("-----------"*5)
-    #     logger.critical(f"generate_query node completed in {time.time() - start_time:.2f} seconds")
-    #     logger.info("---------------------"*8)
-
-    #     return {"messages": [response]}
